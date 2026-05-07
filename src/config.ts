@@ -6,6 +6,8 @@ dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const TAG = "CONFIG";
 
+const isLocal = process.env.APP_ENV?.toUpperCase() === "LOCAL";
+
 const mandatoryEnvironmentConstants = [
   "APP_ENV",
   "PORT",
@@ -15,6 +17,9 @@ const mandatoryEnvironmentConstants = [
   "MONGODB_USERNAME",
   "MONGODB_PASSWORD",
   "MONGODB_HOST",
+  "WHATSAPP_PHONE_NUMBER_ID",
+  "WHATSAPP_SYSTEM_TOKEN",
+  ...(isLocal ? ["NGROK_DOMAIN"] : []),
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -41,7 +46,7 @@ if (missingEnvironmentVariables.length > 0) {
 }
 
 export const CONFIG = {
-  IS_LOCAL_ENVIRONMENT: process.env.APP_ENV || false,
+  IS_LOCAL_ENVIRONMENT: isLocal,
   PORT: parseInt(process.env.PORT || "0", 10) || 4000,
   REDIS_HOST_PORT: process.env.REDIS_HOST_PORT
     ? parseInt(process.env.REDIS_HOST_PORT)
@@ -55,6 +60,9 @@ export const CONFIG = {
   MONGODB_USERNAME: process.env.MONGODB_USERNAME || "",
   MONGODB_PASSWORD: process.env.MONGODB_PASSWORD || "",
   MONGODB_HOST: process.env.MONGODB_HOST || "",
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+  WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || "",
+  NGROK_DOMAIN: process.env.NGROK_DOMAIN || "",
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
