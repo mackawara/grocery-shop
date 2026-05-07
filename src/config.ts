@@ -15,6 +15,8 @@ const mandatoryEnvironmentConstants = [
   "MONGODB_USERNAME",
   "MONGODB_PASSWORD",
   "MONGODB_HOST",
+  "WHATSAPP_PHONE_NUMBER_ID",
+  "WHATSAPP_SYSTEM_TOKEN"
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -55,6 +57,9 @@ export const CONFIG = {
   MONGODB_USERNAME: process.env.MONGODB_USERNAME || "",
   MONGODB_PASSWORD: process.env.MONGODB_PASSWORD || "",
   MONGODB_HOST: process.env.MONGODB_HOST || "",
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+  WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || "",
+
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
