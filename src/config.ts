@@ -11,6 +11,7 @@ const mandatoryEnvironmentConstants = [
   "PORT",
   "REDIS_HOST_PORT",
   "REDIS_HOST",
+  "WHATSAPP_WEBHOOK_VERIFICATION_TOKEN",
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -47,6 +48,7 @@ export const CONFIG = {
     process.env.REDIS_CONNECT_TIMEOUT || "0",
     10,
   ) || 90000,
+  WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN || "",
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
