@@ -85,6 +85,22 @@ export const deleteRedisHashField = async (
   }
 };
 
+<<<<<<< HEAD
+=======
+export const isMessageProcessed = async (
+  key: string,
+  ttlSeconds: number,
+): Promise<boolean> => {
+  try {
+    const result = await redisClient.set(key, "1", { NX: true, EX: ttlSeconds });
+    return result === null; // null means key already existed → already processed
+  } catch (error) {
+    logger.error(`[${TAG}] Error in isMessageProcessed for ${key}: ${error}`);
+    return false;
+  }
+};
+
+>>>>>>> 1ee6f08 (CU-86b9uuuep - create redis hash controller)
 export const deleteRedisHash = async (hashName: string): Promise<SetResult> => {
   if (!hashName) {
     return { success: false, error: "hashName is required" };
