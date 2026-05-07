@@ -1,0 +1,20 @@
+#!/bin/sh
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+# Expected format: CU-<id>_<description>_<author>
+pattern="^CU-[a-zA-Z0-9]+_[a-zA-Z0-9-]+_.+"
+
+# Allow main and develop branches to pass through
+if [ "$branch" = "main" ] || [ "$branch" = "develop" ]; then
+  exit 0
+fi
+
+if ! echo "$branch" | grep -qE "$pattern"; then
+  echo ""
+  echo "❌ Invalid branch name: $branch"
+  echo ""
+  echo "   Expected: CU-<ticket-id>_<description>_<author>"
+  echo "   Example:  CU-86b9udvxf_create-commit-rules-using-husky_Mac-kawara"
+  echo ""
+  exit 1
+fi
