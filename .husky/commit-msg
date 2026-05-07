@@ -1,0 +1,17 @@
+#!/bin/sh
+commit_msg=$(cat "$1")
+
+# Expected format: CU-<id> - <description>
+pattern="^CU-[a-zA-Z0-9]+ - .+"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo ""
+  echo "❌ Invalid commit message format."
+  echo ""
+  echo "   Expected: CU-<ticket-id> - <description>"
+  echo "   Example:  CU-86b9udvxf - create commit rules using husky"
+  echo ""
+  echo "   Got: $commit_msg"
+  echo ""
+  exit 1
+fi
