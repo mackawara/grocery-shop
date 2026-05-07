@@ -9,6 +9,8 @@ const TAG = "CONFIG";
 const mandatoryEnvironmentConstants = [
   "APP_ENV",
   "PORT",
+  "REDIS_HOST_PORT",
+  "REDIS_HOST",
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -37,6 +39,14 @@ if (missingEnvironmentVariables.length > 0) {
 export const CONFIG = {
   IS_LOCAL_ENVIRONMENT: process.env.APP_ENV || false,
   PORT: parseInt(process.env.PORT || "0", 10) || 4000,
+  REDIS_HOST_PORT: process.env.REDIS_HOST_PORT
+    ? parseInt(process.env.REDIS_HOST_PORT)
+    : 6379,
+  REDIS_HOST: process.env.REDIS_HOST || "localhost",
+  REDIS_CONNECT_TIMEOUT: parseInt(
+    process.env.REDIS_CONNECT_TIMEOUT || "0",
+    10,
+  ) || 90000,
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
