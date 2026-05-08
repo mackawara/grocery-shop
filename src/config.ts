@@ -12,6 +12,9 @@ const mandatoryEnvironmentConstants = [
   "REDIS_HOST_PORT",
   "REDIS_HOST",
   "WHATSAPP_WEBHOOK_VERIFICATION_TOKEN",
+  "MONGODB_USERNAME",
+  "MONGODB_PASSWORD",
+  "MONGODB_HOST",
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -49,6 +52,9 @@ export const CONFIG = {
     10,
   ) || 90000,
   WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN || "",
+  MONGODB_USERNAME: process.env.MONGODB_USERNAME || "",
+  MONGODB_PASSWORD: process.env.MONGODB_PASSWORD || "",
+  MONGODB_HOST: process.env.MONGODB_HOST || "",
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,

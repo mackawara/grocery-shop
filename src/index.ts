@@ -2,6 +2,7 @@ import {startServer} from "./server";
 import { logger } from "./services/logger";
 import { RedisService } from "./services/redis";
 import { CONFIG } from "./config";
+import { connectDb } from "./services/database";
 
 
 Promise.race([
@@ -14,6 +15,7 @@ Promise.race([
 ])
 .then(async () => {
     startServer();
+    await connectDb();
   })
   .catch((error) => {
     logger.error(error);
