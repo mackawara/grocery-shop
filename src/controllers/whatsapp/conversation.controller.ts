@@ -7,7 +7,7 @@ import { orderFlowHandler } from './orderFlowHandler';
 import { handleDeliveryLocation } from '../delivery/deliveryFlowHandler';
 import { initiateOrderPayment } from '../payments/payment.controller';
 import { parsePaymentRetryButtonId } from '../../constants/payments';
-import whatsappMessager from './outgoingMessages';
+import whatsappMessager, { messageComposer } from './outgoingMessages';
 import type {
   Text,
   InteractivePayLoad,
@@ -17,15 +17,26 @@ import type {
   InteractiveNfmReplyNotification,
   LocationMessageNotification,
 } from '../../types/types';
+import { MESSAGES_CONSTRUCTOR} from './messages';
+import { MainMenuSections } from './messageSections';
+import { MAIN_MENU_REPLY_IDS } from '../../constants/whatsapp';
 
 const WA_MSG_KEY_PREFIX = 'wa:msg:';
+
 
 export const isWhatsAppMessageProcessed = (messageId: string): Promise<boolean> =>
   isMessageProcessed(`${WA_MSG_KEY_PREFIX}${messageId}`, WA_MESSAGE_TTL_SECONDS);
 
 export const textHandler = async (from: string, text: Text['text']): Promise<void> => {
   logger.info('[TEXT_MESSAGE] : Processing text message from:', from, '| body:', text.body);
-  await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
+await whatsappMessager.sendInteractive(
+  from,
+  messageComposer.messageWithReplyList({
+    text: MESSAGES_CONSTRUCTOR.welcomeMessage,
+    listName: 'Main Menu',
+    sections: MainMenuSections,
+  }),
+);
 };
 
 const buttonReplyHandler = async (
@@ -72,6 +83,21 @@ const listReplyHandler = async (
     from,
     `List reply received — id: ${list_reply.id}, title: "${list_reply.title}"`,
   );
+  switch (list_reply.id) {
+    case MAIN_MENU_REPLY_IDS.shop:
+      logger.info('shop button was clicked');
+      await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
+      //TO DO:  Handle shop action
+      break;
+    case MAIN_MENU_REPLY_IDS.view_deliveries:
+      logger.info('view deliveries was clicked');
+      //TO DO: Handle view deliveries action
+      break;
+    case MAIN_MENU_REPLY_IDS.enquries:
+      logger.info('enquiries button was clicked');
+      //TO DO: Handle enquiries action
+      break;
+  }
 };
 
 const nfmReplyHandler = async (
