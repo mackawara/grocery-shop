@@ -1,7 +1,7 @@
 import { logger } from "../../services/logger";
 import { isMessageProcessed } from "../redis/redis.controller";
 import { WA_MESSAGE_TTL_SECONDS } from "../../constants/whatsapp";
-import whatsappMessager from "./outgoingMessages";
+import whatsappMessager, { messageComposer } from "./outgoingMessages";
 import {
   Text,
   InteractivePayLoad,
@@ -10,6 +10,9 @@ import {
   InteractiveListReplyNotifications,
   InteractiveNfmReplyNotification,
 } from "../../types/types";
+import { MAIN_MENU_REPLY_IDS } from "../../constants/whatsapp";
+import {MESSAGES_CONSTRUCTOR} from "./messages";
+import { MainMenuSections } from "./messageSections";
 
 const WA_MSG_KEY_PREFIX = "wa:msg:";
 
@@ -19,6 +22,12 @@ export const isWhatsAppMessageProcessed = (messageId: string): Promise<boolean> 
 export const textHandler = async (from: string, text: Text["text"]): Promise<void> => {
   logger.info("[TEXT_MESSAGE] : Processing text message from:", from, "| body:", text.body);
   await whatsappMessager.sendFreeFormTextMessage(from, `Message received: "${text.body}"`);
+
+  await messageComposer.messageWithReplyList({
+    text: MESSAGES_CONSTRUCTOR.welcomeMessage,
+    listName: "Main Menu",
+    sections: MainMenuSections
+  }) 
 };
 
 const buttonReplyHandler = async (from: string, interactive: InteractiveButtonReplyNotification): Promise<void> => {
@@ -31,6 +40,17 @@ const listReplyHandler = async (from: string, interactive: InteractiveListReplyN
   const { list_reply } = interactive;
   logger.info("[INTERACTIVE_LIST_REPLY] : from:", from, "| id:", list_reply.id, "| title:", list_reply.title);
   await whatsappMessager.sendFreeFormTextMessage(from, `List reply received — id: ${list_reply.id}, title: "${list_reply.title}"`);
+  switch (list_reply.id) {
+    case MAIN_MENU_REPLY_IDS.shop:
+      //TO DO:  Handle shop action
+      break;
+    case MAIN_MENU_REPLY_IDS.view_deliveries:
+      //TO DO: Handle view deliveries action
+      break;
+    case MAIN_MENU_REPLY_IDS.enquries:
+      //TO DO: Handle enquiries action
+      break;
+  }
 };
 
 const nfmReplyHandler = async (from: string, interactive: InteractiveNfmReplyNotification): Promise<void> => {
