@@ -9,50 +9,71 @@ import {
 } from "../../types/types";
 import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from "./conversation.controller";
 import { orderHandler } from "./whatsappOrderHandler";
+import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
+import { WaInteractiveType, WaMessageType } from "../../models/whatsappMessage.model";
+import { fromUnixTime } from "date-fns";
 
 export const incomingMessagesHandler = async (req: Request, res: Response) => {
+  res.status(200).json({ success: true });
+
   const reqBody: WebhookNotificationBody = req.body;
 
   try {
     if (reqBody.object) {
       const { messages } = reqBody.entry[0].changes[0].value;
       if (messages) {
-        const message = messages[0];
-        const { id: messageId, type: notificationType, from } = message;
+        const { id: messageId, type: messageType, from, timestamp } = messages[0];
+        const waTimestamp = fromUnixTime(Number(timestamp));
 
         if (await isWhatsAppMessageProcessed(messageId)) {
           logger.warn("[INCOMING_MESSAGE] : Duplicate message ignored:", messageId);
-          return res.status(200).json({ success: true });
+          return;
         }
 
-        switch (notificationType) {
-          case "text":
-            {
-              const { text } = message as Text;
-              await textHandler(from, text);
-            }
+        let content = "";
+        let interactiveType: WaInteractiveType | undefined;
+
+        switch (messageType) {
+          case "text": {
+            const { text } = messages[0] as Text;
+            content = text.body;
+            await textHandler(from, text);
             break;
-          case "interactive":
-            {
-              const { interactive } = message as InteractiveMessageNotification;
-              await interactiveHandler(from, interactive);
-            }
+          }
+          case "interactive": {
+            const { interactive } = messages[0] as InteractiveMessageNotification;
+            interactiveType = interactive.type;
+            content = interactive.type;
+            await interactiveHandler(from, interactive);
             break;
-          case "order":
-            {
-              const { order } = message as OrderMessageNotification;
-              await orderHandler(from, order);
-            }
+          }
+          case "order": {
+            const { order } = messages[0] as OrderMessageNotification;
+            content = `${order.product_items.length} item(s) from catalog ${order.catalog_id}`;
+            await orderHandler(from, order);
             break;
-          case "reaction":
-            {
-              const { reaction } = message as ReactionMessageNotification;
-              await reactionHandler(from, reaction);
-            }
+          }
+          case "reaction": {
+            const { reaction } = messages[0] as ReactionMessageNotification;
+            content = reaction.emoji;
+            await reactionHandler(from, reaction);
             break;
+          }
           default:
-            logger.warn("[INCOMING_MESSAGE] : Unhandled message type:", notificationType, "from:", from);
-            break;
+            logger.warn("[INCOMING_MESSAGE] : Unhandled message type:", messageType, "from:", from);
+        }
+
+        if (content) {
+          await saveWhatsappMessage({
+            phoneNumber: from,
+            direction: "inbound",
+            messageType: messageType as WaMessageType,
+            interactiveType,
+            content,
+            externalId: messageId,
+            timestamp: waTimestamp,
+            status: "received",
+          });
         }
       }
     }
@@ -60,7 +81,4 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
     logger.error("[INCOMING_MESSAGE] : Error processing incoming message:", error);
   }
 
-  return res.status(200).json({
-    success: true,
-  });
 };

@@ -85,8 +85,6 @@ export const deleteRedisHashField = async (
   }
 };
 
-<<<<<<< HEAD
-=======
 export const isMessageProcessed = async (
   key: string,
   ttlSeconds: number,
@@ -100,7 +98,6 @@ export const isMessageProcessed = async (
   }
 };
 
->>>>>>> 1ee6f08 (CU-86b9uuuep - create redis hash controller)
 export const deleteRedisHash = async (hashName: string): Promise<SetResult> => {
   if (!hashName) {
     return { success: false, error: "hashName is required" };
