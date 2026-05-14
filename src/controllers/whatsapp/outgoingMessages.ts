@@ -7,6 +7,9 @@ import { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSectio
 import { isEmpty } from "lodash";
 
 
+import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
+
+
 const whatsappApiVersion = "v21.0";
 
 export interface MessageResult {
@@ -23,7 +26,6 @@ const sendFreeFormTextMessage = async (
   text: string,
 ): Promise<MessageResult> => {
   try {
-    logger.info(messagesEndpointUrl);
 
     const response = await axios({
       method: "POST",
@@ -42,6 +44,16 @@ const sendFreeFormTextMessage = async (
       return { success: false, error: `Failed to send message. Status code: ${response?.status}` };
     }
 
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: "outbound",
+      messageType: "text",
+      content: text,
+      externalId: response.data?.messages?.[0]?.id,
+      timestamp: new Date(),
+      status: "sent",
+    });
+
     return { success: true };
 
   } catch (err: any) {
@@ -49,6 +61,15 @@ const sendFreeFormTextMessage = async (
       const errorMessage = err.response?.data?.error?.message || "Unknown Facebook API Error";
       logger.error(errorMessage);
     }
+
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: "outbound",
+      messageType: "text",
+      content: text,
+      timestamp: new Date(),
+      status: "failed",
+    });
 
     return { success: false, error: err.message };
   }
@@ -78,6 +99,17 @@ const sendInteractive = async (
 
     logger.info(`${TAG}: message sent to ${receivingNumber}, status: ${result.statusText}`);
 
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: "outbound",
+      messageType: "interactive",
+      interactiveType: interactiveObject.type,
+      content: interactiveObject.body?.text ?? interactiveObject.type,
+      externalId: result.data?.messages?.[0]?.id,
+      timestamp: new Date(),
+      status: "sent",
+    });
+
     return { success: true };
 
   } catch (err: any) {
@@ -85,6 +117,17 @@ const sendInteractive = async (
       const { message, fbtrace_id, error_data } = err.response.data.error;
       logger.error(`${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`);
     }
+
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: "outbound",
+      messageType: "interactive",
+      interactiveType: interactiveObject.type,
+      content: interactiveObject.body?.text ?? interactiveObject.type,
+      timestamp: new Date(),
+      status: "failed",
+    });
+
     return { success: false, error: err.message };
   }
 };
@@ -232,9 +275,32 @@ export async function sendWhatsAppCatalogMessage({
     }
 
     logger.info(`WhatsApp catalog_message sent successfully to ${phone}`);
+
+    await saveWhatsappMessage({
+      phoneNumber: cleanedPhoneNumber,
+      direction: "outbound",
+      messageType: "interactive",
+      interactiveType: "catalog_message",
+      content: bodyText,
+      externalId: response.data?.messages?.[0]?.id,
+      timestamp: new Date(),
+      status: "sent",
+    });
+
     return { success: true };
   } catch (error: any) {
     logger.error("Error sending WhatsApp catalog_message:", error);
+
+    await saveWhatsappMessage({
+      phoneNumber: phone,
+      direction: "outbound",
+      messageType: "interactive",
+      interactiveType: "catalog_message",
+      content: bodyText,
+      timestamp: new Date(),
+      status: "failed",
+    });
+
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
