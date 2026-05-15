@@ -8,13 +8,14 @@ import {
   ReactionMessageNotification,
 } from "../../types/types";
 import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from "./conversation.controller";
-import { orderHandler } from "./whatsappOrderHandler";
+import { whatsappOrderHandler } from "./whatsappOrderHandler";
 import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
 import { WaInteractiveType, WaMessageType } from "../../models/whatsappMessage.model";
 import { fromUnixTime } from "date-fns";
+import whatsappMessager from "./outgoingMessages";
 
 export const incomingMessagesHandler = async (req: Request, res: Response) => {
-  res.status(200).json({ success: true });
+  res.status(200).json({ success: true });// early return to avoid repeated processing in case of retries from WhatsApp
 
   const reqBody: WebhookNotificationBody = req.body;
 
@@ -37,6 +38,7 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
           case "text": {
             const { text } = messages[0] as Text;
             content = text.body;
+            await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
             await textHandler(from, text);
             break;
           }
@@ -50,7 +52,7 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
           case "order": {
             const { order } = messages[0] as OrderMessageNotification;
             content = `${order.product_items.length} item(s) from catalog ${order.catalog_id}`;
-            await orderHandler(from, order);
+            await whatsappOrderHandler(from, order);
             break;
           }
           case "reaction": {
