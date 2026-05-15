@@ -63,6 +63,8 @@ export const CONFIG = {
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
   WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || "",
   NGROK_DOMAIN: process.env.NGROK_DOMAIN || "",
+  SHOP_NAME: process.env.SHOP_NAME || "",
+  SHOP_ADDRESS: process.env.SHOP_ADDRESS || "",
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
