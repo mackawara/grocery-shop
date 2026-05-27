@@ -3,7 +3,7 @@ import fs from "fs";
 import util from "util";
 import { createLogger, transports, format as winstonFormat } from "winston";
 
-const { colorize, combine, simple, timestamp } = winstonFormat;
+const { colorize, combine, simple } = winstonFormat;
 
 type LogLevel = "error" | "warn" | "info" | "verbose" | "debug" | "silly";
 const LEVELS: LogLevel[] = [
@@ -28,9 +28,9 @@ const winstonLogger = createLogger({
   ],
 });
 
-const writeLogType = (logLevel: LogLevel, writeSync = false) => {
+const writeLogType = (logLevel: LogLevel, writeSync = false) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return function (...theArguments: any[]) {
+   function (...theArguments: any[]) {
     const args = Array.from(theArguments);
 
     const loggerMessage = args
@@ -60,8 +60,8 @@ const writeLogType = (logLevel: LogLevel, writeSync = false) => {
         return;
       }
     }
-  };
-};
+  }
+;
 
 export const logger = {
   silly: writeLogType("silly"),

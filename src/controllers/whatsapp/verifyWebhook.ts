@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { CONFIG } from "../../config";
 
 interface payload {
@@ -6,6 +6,7 @@ interface payload {
   "hub.verify_token": string;
   "hub.challenge": string;
 }
+
 export const verifyWebhookToken =
   () =>
   async (request: Request<{ Querystring: payload }>, response: Response) => {

@@ -1,9 +1,14 @@
 // TODO: Stub model — fill in full schema fields (e.g. name, email, address) before production use
+<<<<<<< HEAD
 import type { Document, Types } from "mongoose";
 import mongoose, { Schema } from "mongoose";
 import { UserRole } from "../constants/models";
 
 export { UserRole };
+=======
+import type { Document} from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+>>>>>>> cc2ce29 (CU-86ba552pv - lint files)
 
 export interface IUser extends Document {
   tenantId: Types.ObjectId;

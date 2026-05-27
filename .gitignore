@@ -58,7 +58,8 @@ node_modules/
 *.tgz
 
 #Vs code settings
-.vscode/
+*.vscode/
+
 
 # Yarn Integrity file
 .yarn-integrity

@@ -59,7 +59,7 @@ export const getRedisHash = async (
 
   try {
     const result = await redisClient.hGetAll(hashName);
-    if (!result || Object.keys(result).length === 0) return null;
+    if (!result || Object.keys(result).length === 0) {return null;}
     return result;
   } catch (error) {
     logger.error(`[${TAG}] Error getting hash ${hashName}: ${error}`);

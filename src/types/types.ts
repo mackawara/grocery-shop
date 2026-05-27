@@ -505,7 +505,7 @@ export const FLOW_TOKENS = {
 export type FlowToken = (typeof FLOW_TOKENS)[keyof typeof FLOW_TOKENS];
 export function hasProperty<K extends string>(
   data: unknown,
-  prop: K
+  prop: K,
 ): data is { [key in K]: unknown } {
   return typeof data === "object" && data !== null && prop in data;
 }
@@ -568,7 +568,7 @@ export interface PaymentDetails {
   phoneNumber: string;
   method: string;
   orderNumber: string;
-  
+
 }
 
 export type TCreateService = {
@@ -576,32 +576,3 @@ export type TCreateService = {
   slug: string;
   lengthInMinutes: number;
 };
-
-export type TSlot = {
-  time: string;
-};
-
-export type TCreateBooking = {
-  start: string;
-  attendee: {
-    name: string;
-    email: string;
-    timeZone: string;
-    phoneNumber: string
-  };
-  eventTypeId: number;
-};
-
-export interface ICalcomSlotsResponse {
-  data: {
-    slots: {
-      [date: string]: TSlot[];
-    };
-  };
-}
-
-export interface ServiceResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}

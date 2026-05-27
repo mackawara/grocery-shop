@@ -67,4 +67,3 @@ export const CONFIG = {
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? "LOCAL" : "PRODUCTION"} environment`,
 );
- 

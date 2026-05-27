@@ -3,7 +3,7 @@ import { logger } from "../../services/logger";
 import { CONFIG } from "../../config";
 import constants from "../../constants";
 import UTILS from "../../utils";
-import { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSection, ReplyButtonObject,} from "../../types/types";
+import type { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSection, ReplyButtonObject } from "../../types/types";
 import { isEmpty } from "lodash";
 
 
@@ -30,7 +30,7 @@ const sendFreeFormTextMessage = async (
     const response = await axios({
       method: "POST",
       url: messagesEndpointUrl,
-      headers: headers,
+      headers,
       data: {
         recipient_type: constants.whatsapp.INDIVIDUAL,
         messaging_product: constants.whatsapp.WHATSAPP,
@@ -56,9 +56,9 @@ const sendFreeFormTextMessage = async (
 
     return { success: true };
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (UTILS.isFacebookAPIError(err)) {
-      const errorMessage = err.response?.data?.error?.message || "Unknown Facebook API Error";
+      const errorMessage = err.response?.data?.error?.message ?? "Unknown Facebook API Error";
       logger.error(errorMessage);
     }
 
@@ -71,7 +71,7 @@ const sendFreeFormTextMessage = async (
       status: "failed",
     });
 
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 };
 
@@ -112,7 +112,7 @@ const sendInteractive = async (
 
     return { success: true };
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (UTILS.isFacebookAPIError(err)) {
       const { message, fbtrace_id, error_data } = err.response.data.error;
       logger.error(`${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`);
@@ -128,7 +128,7 @@ const sendInteractive = async (
       status: "failed",
     });
 
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 };
 
@@ -152,11 +152,7 @@ export function createFlowInteractive(params: {
     headerText,
     footerText,
   } = params;
-  const flowActionPayload = {
-    screen: initialScreen,
-    data:
-      isEmpty(initialData) || initialData === undefined ? null : initialData,
-  };
+  
   const interactive: InteractiveFlow = {
     type: "flow",
     //sub_type: "interactive",
@@ -288,7 +284,7 @@ export async function sendWhatsAppCatalogMessage({
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error sending WhatsApp catalog_message:", error);
 
     await saveWhatsappMessage({
