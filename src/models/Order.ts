@@ -1,10 +1,12 @@
 // TODO: Stub model — extend with delivery address, discount, and channel fields before production use
-import mongoose, { Document, Schema, Types } from 'mongoose';
+import type { Document, Types } from "mongoose";
+import mongoose, { Schema } from "mongoose";
+import { OrderStatus, PaymentStatus, DeliveryStatus } from "../constants/models";
 
-type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'completed' | 'cancelled';
-type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export { OrderStatus, PaymentStatus, DeliveryStatus };
 
 export interface IOrder extends Document {
+  tenantId: Types.ObjectId;
   orderNumber: string;
   user: Types.ObjectId;
   totalAmount: number;
@@ -17,23 +19,29 @@ export interface IOrder extends Document {
     method?: string;
     reference?: string;
   };
+  deliveryDetails?: {
+    address: string;
+    status: DeliveryStatus;
+    expectedDeliveryDate: Date;
+  };
 }
 
 const OrderSchema = new Schema<IOrder>(
   {
-    orderNumber: { type: String, required: true, unique: true, index: true },
-    user: { type: Schema.Types.ObjectId, ref: 'User' },
+    tenantId: { type: Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
+    orderNumber: { type: String, required: true },
+    user: { type: Schema.Types.ObjectId, ref: "User" },
     totalAmount: { type: Number, required: true, default: 0 },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'processing', 'completed', 'cancelled'],
-      default: 'pending',
+      enum: Object.values(OrderStatus),
+      default: OrderStatus.PENDING,
     },
     orderDate: { type: Date, required: true },
     notes: { type: String },
-    orderItems: [{ type: Schema.Types.ObjectId, ref: 'OrderItem' }],
+    orderItems: [{ type: Schema.Types.ObjectId, ref: "OrderItem" }],
     paymentDetails: {
-      status: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
+      status: { type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING },
       method: { type: String },
       reference: { type: String },
     },
@@ -41,4 +49,6 @@ const OrderSchema = new Schema<IOrder>(
   { timestamps: true },
 );
 
-export default mongoose.models?.Order ?? mongoose.model<IOrder>('Order', OrderSchema);
+OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
+
+export default mongoose.model<IOrder>("Order", OrderSchema);
