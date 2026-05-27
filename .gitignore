@@ -57,6 +57,9 @@ node_modules/
 # Output of 'npm pack'
 *.tgz
 
+#Vs code settings
+.vscode/
+
 # Yarn Integrity file
 .yarn-integrity
 

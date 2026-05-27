@@ -1,17 +1,31 @@
 // TODO: Stub model — fill in full schema fields (e.g. name, email, address) before production use
-import mongoose, { Document, Schema } from 'mongoose';
+import type { Document, Types } from "mongoose";
+import mongoose, { Schema } from "mongoose";
+import { UserRole } from "../constants/models";
+
+export { UserRole };
 
 export interface IUser extends Document {
+  tenantId: Types.ObjectId;
   phoneNumber: string;
   name?: string;
+  role: UserRole;
 }
 
 const UserSchema = new Schema<IUser>(
   {
-    phoneNumber: { type: String, required: true, unique: true, index: true },
+    tenantId: { type: Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
+    phoneNumber: { type: String, required: true },
     name: { type: String },
+    role: {
+      type: String,
+      enum: Object.values(UserRole),
+      default: UserRole.CUSTOMER,
+    },
   },
   { timestamps: true },
 );
 
-export default mongoose.model<IUser>('User', UserSchema);
+UserSchema.index({ tenantId: 1, phoneNumber: 1 }, { unique: true });
+
+export default mongoose.model<IUser>("User", UserSchema);

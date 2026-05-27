@@ -1,5 +1,6 @@
-import mongoose, { Schema, Document } from "mongoose";
-import { MessageNotification, InteractivePayLoad } from "../types/types";
+import type { Document, Types } from "mongoose";
+import mongoose, { Schema } from "mongoose";
+import type { MessageNotification, InteractivePayLoad } from "../types/types";
 
 export type WaMessageDirection = "inbound" | "outbound";
 export type WaMessageType = MessageNotification["type"];
@@ -14,6 +15,7 @@ export type WaInteractiveType =
 export type WaMessageStatus = "received" | "sent" | "failed";
 
 export interface IWhatsappMessage extends Document {
+  tenantId: Types.ObjectId;
   phoneNumber: string;
   direction: WaMessageDirection;
   messageType: WaMessageType;
@@ -26,7 +28,8 @@ export interface IWhatsappMessage extends Document {
 
 const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
   {
-    phoneNumber: { type: String, required: true, index: true },
+    tenantId: { type: Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
+    phoneNumber: { type: String, required: true },
     direction: { type: String, enum: ["inbound", "outbound"], required: true },
     messageType: {
       type: String,
@@ -49,7 +52,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
       default: null,
     },
     content: { type: String, required: true },
-    externalId: { type: String, unique: true, sparse: true },
+    externalId: { type: String, sparse: true },
     timestamp: { type: Date, required: true },
     status: {
       type: String,
@@ -60,5 +63,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
   { timestamps: true },
 );
 
-export default mongoose.models?.WhatsappMessage ||
-  mongoose.model<IWhatsappMessage>("WhatsappMessage", WhatsappMessageSchema);
+WhatsappMessageSchema.index({ tenantId: 1, phoneNumber: 1 });
+WhatsappMessageSchema.index({ tenantId: 1, externalId: 1 }, { unique: true, sparse: true });
+
+export default mongoose.model<IWhatsappMessage>("WhatsappMessage", WhatsappMessageSchema);
