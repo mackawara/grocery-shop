@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { tenantScope } from "./plugins/tenantScope";
 
 export interface IDeliveryAddress extends Document {
+  tenantId: mongoose.Types.ObjectId;
   user: mongoose.Types.ObjectId;
   streetNumber: string;
   streetName: string;
@@ -15,6 +17,12 @@ export interface IDeliveryAddress extends Document {
 
 const DeliveryAddressSchema = new Schema<IDeliveryAddress>(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      required: true,
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -53,7 +61,9 @@ const DeliveryAddressSchema = new Schema<IDeliveryAddress>(
   { timestamps: true },
 );
 
-DeliveryAddressSchema.index({ area: 1, city: 1 });
+DeliveryAddressSchema.index({ tenantId: 1, area: 1, city: 1 });
+
+DeliveryAddressSchema.plugin(tenantScope);
 
 export default mongoose.model<IDeliveryAddress>(
   "DeliveryAddress",

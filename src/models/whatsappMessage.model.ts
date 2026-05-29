@@ -1,6 +1,7 @@
 import type { Document, Types } from "mongoose";
 import mongoose, { Schema } from "mongoose";
 import type { MessageNotification, InteractivePayLoad } from "../types/types";
+import { tenantScope } from "./plugins/tenantScope";
 
 export type WaMessageDirection = "inbound" | "outbound";
 export type WaMessageType = MessageNotification["type"];
@@ -65,5 +66,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
 
 WhatsappMessageSchema.index({ tenantId: 1, phoneNumber: 1 });
 WhatsappMessageSchema.index({ tenantId: 1, externalId: 1 }, { unique: true, sparse: true });
+
+WhatsappMessageSchema.plugin(tenantScope);
 
 export default mongoose.model<IWhatsappMessage>("WhatsappMessage", WhatsappMessageSchema);

@@ -26,6 +26,26 @@ export default defineConfig([
     'no-trailing-spaces': 'error',
     'no-unneeded-ternary': 'error',
     'consistent-return': 'error',
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: "MemberExpression[property.name='estimatedDocumentCount']",
+        message:
+          'estimatedDocumentCount is not tenant-aware; use countDocuments instead.',
+      },
+      {
+        selector:
+          "Property:matches([key.name='$lookup'], [key.value='$lookup'], [key.name='$graphLookup'], [key.value='$graphLookup'], [key.name='$unionWith'], [key.value='$unionWith'])",
+        message:
+          'Aggregation joins ($lookup/$graphLookup/$unionWith) bypass tenant scoping on the joined collection. The sub-pipeline MUST include a { $match: { tenantId } } stage. If verified, disable this line with an explanation: // eslint-disable-next-line no-restricted-syntax.',
+      },
+      {
+        selector:
+          "Property:matches([key.name='$merge'], [key.value='$merge'], [key.name='$out'], [key.value='$out'])",
+        message:
+          '$merge/$out write aggregation results into a collection without tenant scoping. Confirm the destination and tenant fields, then disable this line with an explanation: // eslint-disable-next-line no-restricted-syntax.',
+      },
+    ],
     '@typescript-eslint/no-unused-vars': [
       'warn',
       {
