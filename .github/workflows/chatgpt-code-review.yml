@@ -1,0 +1,127 @@
+name: ChatGPT Code Review
+
+# Review only when explicitly asked: comment "/chatgpt-review" on the PR.
+# issue_comment fires for comments on both issues and PRs, so the job's `if`
+# below narrows it to PR comments carrying the command. Nothing runs on push.
+on:
+  issue_comment:
+    types: [created]
+
+# One review per PR at a time; commenting again cancels an in-flight run.
+concurrency:
+  group: chatgpt-review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  chatgpt-review:
+    runs-on: ubuntu-latest
+    # Gate on: (1) the comment is on a PR, not a plain issue; (2) it contains the
+    # command; (3) the commenter has write access, so outsiders can't trigger
+    # runs that spend the OPENAI_API_KEY.
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/chatgpt-review') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Acknowledge the command with a reaction so the asker knows it was picked
+      # up while the review runs.
+      - name: React to the trigger comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID/reactions" \
+            -f content=eyes
+
+      # issue_comment carries no PR head/base refs, so resolve the target PR's
+      # base SHA explicitly before checking it out.
+      - name: Resolve PR base SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          base_sha=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json baseRefOid --jq .baseRefOid)
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+      # SECURITY: check out the BASE branch, not the PR head. The script below
+      # runs with OPENAI_API_KEY and a write token, so it must be the trusted
+      # version from the target branch — never code the PR author can modify.
+      - name: Checkout base branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.pr.outputs.base_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.12'
+
+      # The PR diff is fetched as DATA via the API and only ever passed to the
+      # model as text — it is never executed, so a malicious diff is inert.
+      - name: Fetch PR diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > pr.diff
+          echo "Diff size: $(wc -c < pr.diff) bytes"
+
+      - name: Run ChatGPT review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-5.5
+          DIFF_FILE: pr.diff
+        run: |
+          python .github/scripts/chatgpt_review.py > review.md
+          cat review.md
+
+      # Reuse a single comment instead of stacking one per push. A hidden marker
+      # identifies the comment we own; if it exists we PATCH it, otherwise we
+      # create it once. The marker is HTML-invisible in the rendered comment.
+      - name: Post or update review comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          OPENAI_MODEL: gpt-5.5
+          TRIGGER_USER: ${{ github.event.comment.user.login }}
+          # Avatar shown at the top of the comment. The comment account stays
+          # github-actions[bot]; this image is what visually brands it. Swap the
+          # URL to use your own logo.
+          AVATAR_URL: https://avatars.githubusercontent.com/u/14957082?s=64
+        run: |
+          marker='<!-- chatgpt-code-review -->'
+
+          # Build the comment: hidden marker, an avatar + title header, the
+          # model's review, then a footer. The marker drives find-and-update;
+          # the avatar/header brand the comment.
+          {
+            printf '%s\n' "$marker"
+            printf '<img src="%s" width="32" align="left" alt="ChatGPT" />\n\n' "$AVATAR_URL"
+            printf '### ChatGPT Code Review\n\n'
+            cat review.md
+            printf '\n\n---\n'
+            printf '_Model: `%s` · triggered by @%s · comment `/chatgpt-review` to refresh._\n' \
+              "$OPENAI_MODEL" "$TRIGGER_USER"
+          } > body.md
+
+          # Find an existing comment containing our marker (first match wins).
+          comment_id=$(gh api \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+            --paginate \
+            --jq "map(select(.body | contains(\"$marker\"))) | .[0].id // empty")
+
+          if [ -n "$comment_id" ]; then
+            echo "Updating existing comment $comment_id"
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+              -F body=@body.md
+          else
+            echo "No existing comment found; creating a new one"
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file body.md
+          fi
