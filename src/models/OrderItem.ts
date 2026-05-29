@@ -1,6 +1,7 @@
 // TODO: Stub model — add productType, SKU, and discount fields once Product model is defined
 import type { Document, Types } from "mongoose";
 import mongoose, { Schema } from "mongoose";
+import { tenantScope } from "./plugins/tenantScope";
 
 export interface IOrderItem extends Document {
   tenantId: Types.ObjectId;
@@ -30,5 +31,7 @@ const OrderItemSchema = new Schema<IOrderItem>(
 );
 
 OrderItemSchema.index({ tenantId: 1, orderNumber: 1 });
+
+OrderItemSchema.plugin(tenantScope);
 
 export const OrderItem = mongoose.model<IOrderItem>("OrderItem", OrderItemSchema);

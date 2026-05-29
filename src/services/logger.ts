@@ -28,6 +28,21 @@ const winstonLogger = createLogger({
   ],
 });
 
+type TenantLabelProvider = () => string | undefined;
+let tenantLabelProvider: TenantLabelProvider = () => undefined;
+
+// Registered once at startup by tenantContext.ts. Kept as a callback (rather
+// than a direct import) so the logger has no dependency on tenant code and
+// can be used safely from any module — including tenantContext itself.
+export const setTenantLabelProvider = (fn: TenantLabelProvider): void => {
+  tenantLabelProvider = fn;
+};
+
+function tenantPrefix(): string {
+  const label = tenantLabelProvider();
+  return label ? `[tenant=${label}] ` : "";
+}
+
 const writeLogType = (logLevel: LogLevel, writeSync = false) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (...theArguments: any[]) {
@@ -36,9 +51,10 @@ const writeLogType = (logLevel: LogLevel, writeSync = false) => {
     const loggerMessage = args
       .map((_) => (typeof _ === "string" ? _ : _?.message || JSON.stringify(_)))
       .join(" ");
+    const prefix = tenantPrefix();
     if (process.env.NODE_ENV === "test") {
       const fileName = "testing-errors.log";
-      const entry = `${format(Date.now(), "yyyy-MM-dd HH:mm:ss")} ${logLevel.toUpperCase()} ${loggerMessage} \n`;
+      const entry = `${format(Date.now(), "yyyy-MM-dd HH:mm:ss")} ${logLevel.toUpperCase()} ${prefix}${loggerMessage} \n`;
       const flag = { flag: "a" };
       if (writeSync) {
         fs.writeFileSync(fileName, entry, flag);
@@ -50,7 +66,7 @@ const writeLogType = (logLevel: LogLevel, writeSync = false) => {
       return;
     }
 
-    winstonLogger[logLevel](util.format(...args));
+    winstonLogger[logLevel](prefix + util.format(...args));
 
     if (
       process.env.NODE_ENV === "production" ||

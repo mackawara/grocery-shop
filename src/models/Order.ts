@@ -2,6 +2,7 @@
 import type { Document, Types } from "mongoose";
 import mongoose, { Schema } from "mongoose";
 import { OrderStatus, PaymentStatus, DeliveryStatus } from "../constants/models";
+import { tenantScope } from "./plugins/tenantScope";
 
 export { OrderStatus, PaymentStatus, DeliveryStatus };
 
@@ -50,5 +51,7 @@ const OrderSchema = new Schema<IOrder>(
 );
 
 OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
+
+OrderSchema.plugin(tenantScope);
 
 export default mongoose.model<IOrder>("Order", OrderSchema);

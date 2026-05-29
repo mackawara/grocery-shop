@@ -1,5 +1,6 @@
 import { redisClient } from "../../services/redis";
 import { logger } from "../../services/logger";
+import { tenantKey } from "../../utils/tenantKey";
 
 const TAG = "REDIS_CONTROLLER";
 const DEFAULT_EXPIRY = 180;
@@ -21,9 +22,10 @@ export const setRedisHashKeyValuePair = async ({
     return { success: false, error: "hashName, key, and value are required" };
   }
 
+  const scopedHash = tenantKey(hashName);
   try {
-    await redisClient.hSet(hashName, key, value);
-    await redisClient.expire(hashName, expiry ?? DEFAULT_EXPIRY);
+    await redisClient.hSet(scopedHash, key, value);
+    await redisClient.expire(scopedHash, expiry ?? DEFAULT_EXPIRY);
     logger.silly(`[${TAG}] Set ${hashName}:${key}`);
     return { success: true };
   } catch (error) {
@@ -41,8 +43,9 @@ export const getRedisHashValue = async (
     return null;
   }
 
+  const scopedHash = tenantKey(hashName);
   try {
-    return await redisClient.hGet(hashName, key) ?? null;
+    return await redisClient.hGet(scopedHash, key) ?? null;
   } catch (error) {
     logger.error(`[${TAG}] Error getting ${hashName}:${key}: ${error}`);
     return null;
@@ -57,9 +60,12 @@ export const getRedisHash = async (
     return null;
   }
 
+  const scopedHash = tenantKey(hashName);
   try {
-    const result = await redisClient.hGetAll(hashName);
-    if (!result || Object.keys(result).length === 0) return null;
+    const result = await redisClient.hGetAll(scopedHash);
+    if (!result || Object.keys(result).length === 0) {
+      return null;
+    }
     return result;
   } catch (error) {
     logger.error(`[${TAG}] Error getting hash ${hashName}: ${error}`);
@@ -75,8 +81,9 @@ export const deleteRedisHashField = async (
     return { success: false, error: "hashName and key are required" };
   }
 
+  const scopedHash = tenantKey(hashName);
   try {
-    await redisClient.hDel(hashName, key);
+    await redisClient.hDel(scopedHash, key);
     logger.silly(`[${TAG}] Deleted field ${hashName}:${key}`);
     return { success: true };
   } catch (error) {
@@ -89,12 +96,17 @@ export const isMessageProcessed = async (
   key: string,
   ttlSeconds: number,
 ): Promise<boolean> => {
+  const scopedKey = tenantKey(key);
   try {
-    const result = await redisClient.set(key, "1", { NX: true, EX: ttlSeconds });
-    return result === null; // null means key already existed → already processed
+    const result = await redisClient.set(scopedKey, "1", { NX: true, EX: ttlSeconds });
+    return result === null;
   } catch (error) {
-    logger.error(`[${TAG}] Error in isMessageProcessed for ${key}: ${error}`);
-    return false;
+    // Fail closed: if we can't confirm dedup (e.g. Redis outage), treat the
+    // message as already processed so it is skipped rather than reprocessed.
+    // Returning false here would let every redelivery through during an outage
+    // and create duplicate orders.
+    logger.error(`[${TAG}] Error in isMessageProcessed for ${key}, failing closed (treating as processed): ${error}`);
+    return true;
   }
 };
 
@@ -103,8 +115,9 @@ export const deleteRedisHash = async (hashName: string): Promise<SetResult> => {
     return { success: false, error: "hashName is required" };
   }
 
+  const scopedHash = tenantKey(hashName);
   try {
-    await redisClient.del(hashName);
+    await redisClient.del(scopedHash);
     logger.silly(`[${TAG}] Deleted hash ${hashName}`);
     return { success: true };
   } catch (error) {

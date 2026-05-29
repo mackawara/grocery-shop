@@ -40,3 +40,21 @@ export enum UserRole {
   SALES_REP = "sales_rep",
   CUSTOMER = "customer",
 }
+
+export enum UserStatus {
+  ACTIVE = "active",
+  VERIFIED = "verified",
+  DORMANT = "dormant",
+  BLACKLISTED = "blacklisted",
+}
+
+export enum PaymentMethod {
+  ECOCASH = "ecocash",
+  OMARI = "omari",
+  CASH_ON_DELIVERY = "cash_on_delivery",
+}
+
+export enum DeliveryMethod {
+  COLLECT = "collect",
+  DOOR_DELIVERY = "door_delivery",
+}
