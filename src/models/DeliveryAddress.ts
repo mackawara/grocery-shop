@@ -1,4 +1,5 @@
-import mongoose, { Schema, Document } from "mongoose";
+import type { Document } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import { tenantScope } from "./plugins/tenantScope";
 
 export interface IDeliveryAddress extends Document {

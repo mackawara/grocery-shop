@@ -1,6 +1,6 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { logger } from "../../services/logger";
-import {
+import type {
   WebhookNotificationBody,
   Text,
   InteractiveMessageNotification,
@@ -10,7 +10,7 @@ import {
 import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from "./conversation.controller";
 import { whatsappOrderHandler } from "./whatsappOrderHandler";
 import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
-import { WaInteractiveType, WaMessageType } from "../../models/whatsappMessage.model";
+import type { WaInteractiveType, WaMessageType } from "../../models/whatsappMessage.model";
 import { fromUnixTime } from "date-fns";
 import whatsappMessager from "./outgoingMessages";
 

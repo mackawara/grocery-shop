@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import type { Types } from "mongoose";
 import Tenant from "../../models/Tenant";
 import { TenantStatus } from "../../constants/models";

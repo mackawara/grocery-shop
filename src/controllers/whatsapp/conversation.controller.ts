@@ -2,7 +2,7 @@ import { logger } from "../../services/logger";
 import { isMessageProcessed } from "../redis/redis.controller";
 import { WA_MESSAGE_TTL_SECONDS } from "../../constants/whatsapp";
 import whatsappMessager from "./outgoingMessages";
-import {
+import type {
   Text,
   InteractivePayLoad,
   ReactionMessageNotification,

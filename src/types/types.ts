@@ -505,7 +505,7 @@ export const FLOW_TOKENS = {
 export type FlowToken = (typeof FLOW_TOKENS)[keyof typeof FLOW_TOKENS];
 export function hasProperty<K extends string>(
   data: unknown,
-  prop: K
+  prop: K,
 ): data is { [key in K]: unknown } {
   return typeof data === "object" && data !== null && prop in data;
 }
@@ -568,7 +568,7 @@ export interface PaymentDetails {
   phoneNumber: string;
   method: string;
   orderNumber: string;
-  
+
 }
 
 export type TCreateService = {
@@ -600,7 +600,7 @@ export interface ICalcomSlotsResponse {
   };
 }
 
-export interface ServiceResponse<T = any> {
+export interface ServiceResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

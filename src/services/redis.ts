@@ -1,4 +1,5 @@
-import { createClient, RedisClientType } from "redis";
+import type { RedisClientType } from "redis";
+import { createClient } from "redis";
 
 import { CONFIG } from "../config";
 import { logger } from "./logger";
@@ -46,6 +47,7 @@ export class RedisService {
 
     this.client.on("reconnecting", () => {
       logger.info(
+        // eslint-disable-next-line max-len
         `[${TAG}] Reconnecting to Redis. HOST: ${CONFIG.REDIS_HOST}. PORT: ${CONFIG.REDIS_HOST_PORT}`,
       );
     });

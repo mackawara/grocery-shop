@@ -1,4 +1,5 @@
-import express, { Request, Response } from "express";
+import type { Request, Response } from "express";
+import express from "express";
 import { logger } from "./services/logger";
 import { CONFIG } from "./config";
 import whatsappRoutes from "./routes/whatsapp.routes";

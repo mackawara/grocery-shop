@@ -1,6 +1,7 @@
-import mongoose, { Types } from "mongoose";
+import type { Types } from "mongoose";
+import mongoose from "mongoose";
 import { logger } from "../../services/logger";
-import { Order } from "../../types/types";
+import type { Order } from "../../types/types";
 import whatsappMessager from "./outgoingMessages";
 import OrderModel from "../../models/Order";
 import { OrderItem } from "../../models/OrderItem";
@@ -38,10 +39,10 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
       orderNumber,
       // user: userId, // TODO: restore once user resolution is wired up
       totalAmount: 0,
-      status: 'pending',
+      status: "pending",
       orderDate: new Date(),
-      notes: order.text || 'Order received via WhatsApp',
-      paymentDetails: { status: 'pending' },
+      notes: order.text || "Order received via WhatsApp",
+      paymentDetails: { status: "pending" },
     });
 
     const orderItemIds: Types.ObjectId[] = [];
@@ -77,12 +78,12 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
     await session.commitTransaction();
     logger.info(`[ORDER_MESSAGE] Order ${orderNumber} committed for ${from}`);
 
-    await setRedisHashKeyValuePair({ hashName: from, key: 'orderNumber', value: orderNumber, expiry: ORDER_SESSION_TTL_SECONDS });
-    await setRedisHashKeyValuePair({ hashName: from, key: 'items', value: JSON.stringify(itemSummaries), expiry: ORDER_SESSION_TTL_SECONDS });
+    await setRedisHashKeyValuePair({ hashName: from, key: "orderNumber", value: orderNumber, expiry: ORDER_SESSION_TTL_SECONDS });
+    await setRedisHashKeyValuePair({ hashName: from, key: "items", value: JSON.stringify(itemSummaries), expiry: ORDER_SESSION_TTL_SECONDS });
 
     const itemsList = itemSummaries
       .map(i => `• ${i.productId} x${i.quantity} — $${i.price.toFixed(2)}`)
-      .join('\n');
+      .join("\n");
 
     await whatsappMessager.sendFreeFormTextMessage(
       from,
@@ -92,7 +93,7 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
   } catch (error) {
     await session.abortTransaction();
     logger.error(`[ORDER_MESSAGE] Error processing order from ${from}:`, error);
-    await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we ran into an issue processing your order. Please try again.');
+    await whatsappMessager.sendFreeFormTextMessage(from, "Sorry, we ran into an issue processing your order. Please try again.");
   } finally {
     session.endSession();
   }

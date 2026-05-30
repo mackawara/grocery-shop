@@ -81,7 +81,7 @@ jobs:
           python .github/scripts/chatgpt_review.py > review.md
           cat review.md
 
-      # Reuse a single comment instead of stacking one per push. A hidden marker
+      # Reuse a single comment ok instead of stacking one per push. A hidden marker
       # identifies the comment we own; if it exists we PATCH it, otherwise we
       # create it once. The marker is HTML-invisible in the rendered comment.
       - name: Post or update review comment

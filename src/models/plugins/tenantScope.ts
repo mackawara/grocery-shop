@@ -64,7 +64,7 @@ const assertTenantMatch = (
   tenantId: string,
   where: string,
 ): void => {
-  if (value != null && String(value) !== tenantId) {
+  if (value !== null && value !== undefined && String(value) !== tenantId) {
     throw new Error(
       `tenantScope: ${where} sets tenantId ${String(value)} but context is ${tenantId}`,
     );
@@ -106,11 +106,11 @@ const scopeUpdate = (query: QueryThis, tenantId: string): void => {
   delete updateDoc.tenantId;
   if (setOp) {
     delete setOp.tenantId;
-    if (Object.keys(setOp).length === 0) delete updateDoc.$set;
+    if (Object.keys(setOp).length === 0) {delete updateDoc.$set;}
   }
   if (setOnInsertOp) {
     delete setOnInsertOp.tenantId;
-    if (Object.keys(setOnInsertOp).length === 0) delete updateDoc.$setOnInsert;
+    if (Object.keys(setOnInsertOp).length === 0) {delete updateDoc.$setOnInsert;}
   }
   query.setUpdate(updateDoc);
 };

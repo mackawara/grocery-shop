@@ -6,7 +6,7 @@ import { logger } from "./logger";
 export const connectDb = (async () => {
   try {
 
-    const mongoString = 'mongodb+srv://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_HOST}'
+    const mongoString = "mongodb+srv://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_HOST}";
 
     const connectionString =
       `mongodb+srv://${CONFIG.MONGODB_USERNAME}:${CONFIG.MONGODB_PASSWORD}@${CONFIG.MONGODB_HOST}`;
@@ -23,7 +23,7 @@ export const connectDb = (async () => {
     return _db;
   } catch (error) {
     logger.error("Failed Database Connection", error);
-    process.exit(1);
+    return process.exit(1);
   }
 });
 
