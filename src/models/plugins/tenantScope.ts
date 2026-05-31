@@ -4,26 +4,26 @@ import type {
   MongooseQueryMiddleware,
   Query,
   Schema,
-} from "mongoose";
-import { Types } from "mongoose";
+} from 'mongoose';
+import { Types } from 'mongoose';
 import {
   isBypassing,
   requireTenantId,
-} from "../../context/tenantContext";
+} from '../../context/tenantContext';
 
 const QUERY_HOOKS: MongooseQueryMiddleware[] = [
-  "countDocuments",
-  "find",
-  "findOne",
-  "findOneAndDelete",
-  "findOneAndReplace",
-  "findOneAndUpdate",
-  "updateOne",
-  "updateMany",
-  "deleteOne",
-  "deleteMany",
-  "distinct",
-  "replaceOne",
+  'countDocuments',
+  'find',
+  'findOne',
+  'findOneAndDelete',
+  'findOneAndReplace',
+  'findOneAndUpdate',
+  'updateOne',
+  'updateMany',
+  'deleteOne',
+  'deleteMany',
+  'distinct',
+  'replaceOne',
 ];
 
 type QueryThis = Query<unknown, unknown>;
@@ -35,13 +35,13 @@ type InsertManyDoc = { tenantId?: Types.ObjectId | string };
 // carry a full replacement document. Both can smuggle a tenantId past the
 // filter scoping, so they need payload sanitizing on top of filter injection.
 const UPDATE_HOOKS = new Set<MongooseQueryMiddleware>([
-  "updateOne",
-  "updateMany",
-  "findOneAndUpdate",
+  'updateOne',
+  'updateMany',
+  'findOneAndUpdate',
 ]);
 const REPLACE_HOOKS = new Set<MongooseQueryMiddleware>([
-  "replaceOne",
-  "findOneAndReplace",
+  'replaceOne',
+  'findOneAndReplace',
 ]);
 
 const toObjectId = (id: string) => new Types.ObjectId(id);
@@ -52,11 +52,11 @@ const toObjectId = (id: string) => new Types.ObjectId(id);
 // plugin can inject. There is no safe automatic rewrite, so we refuse to run
 // them implicitly and force the caller to opt out via runWithoutTenant.
 const CROSS_COLLECTION_STAGES = [
-  "$lookup",
-  "$graphLookup",
-  "$unionWith",
-  "$merge",
-  "$out",
+  '$lookup',
+  '$graphLookup',
+  '$unionWith',
+  '$merge',
+  '$out',
 ] as const;
 
 const assertTenantMatch = (
@@ -95,22 +95,22 @@ const scopeUpdate = (query: QueryThis, tenantId: string): void => {
   // tenant's scoped queries but lingers as dark data exposed by raw access or
   // future bugs. There is no valid reason to drop a doc's tenant, so reject it
   // outright rather than silently dropping the operator.
-  if (unsetOp && "tenantId" in unsetOp) {
-    throw new Error("tenantScope: update may not $unset tenantId");
+  if (unsetOp && 'tenantId' in unsetOp) {
+    throw new Error('tenantScope: update may not $unset tenantId');
   }
 
-  assertTenantMatch(updateDoc.tenantId, tenantId, "update");
-  assertTenantMatch(setOp?.tenantId, tenantId, "update $set");
-  assertTenantMatch(setOnInsertOp?.tenantId, tenantId, "update $setOnInsert");
+  assertTenantMatch(updateDoc.tenantId, tenantId, 'update');
+  assertTenantMatch(setOp?.tenantId, tenantId, 'update $set');
+  assertTenantMatch(setOnInsertOp?.tenantId, tenantId, 'update $setOnInsert');
 
   delete updateDoc.tenantId;
   if (setOp) {
     delete setOp.tenantId;
-    if (Object.keys(setOp).length === 0) delete updateDoc.$set;
+    if (Object.keys(setOp).length === 0) {delete updateDoc.$set;}
   }
   if (setOnInsertOp) {
     delete setOnInsertOp.tenantId;
-    if (Object.keys(setOnInsertOp).length === 0) delete updateDoc.$setOnInsert;
+    if (Object.keys(setOnInsertOp).length === 0) {delete updateDoc.$setOnInsert;}
   }
   query.setUpdate(updateDoc);
 };
@@ -124,7 +124,7 @@ const scopeReplacement = (query: QueryThis, tenantId: string): void => {
     return;
   }
   const replacementDoc = doc as Record<string, unknown>;
-  assertTenantMatch(replacementDoc.tenantId, tenantId, "replacement");
+  assertTenantMatch(replacementDoc.tenantId, tenantId, 'replacement');
   replacementDoc.tenantId = toObjectId(tenantId);
   query.setUpdate(replacementDoc);
 };
@@ -134,9 +134,9 @@ export function tenantScope(schema: Schema): void {
   // TypeScript type); the plugin owns only the runtime scoping behavior. Assert
   // the field exists so a model that applies the plugin but forgets to declare
   // tenantId fails at boot rather than silently skipping tenant isolation.
-  if (!schema.path("tenantId")) {
+  if (!schema.path('tenantId')) {
     throw new Error(
-      "tenantScope requires a `tenantId` ObjectId path on the schema",
+      'tenantScope requires a `tenantId` ObjectId path on the schema',
     );
   }
 
@@ -159,32 +159,32 @@ export function tenantScope(schema: Schema): void {
   // bulkWrite bundles arbitrary insert/update/replace/delete ops and triggers no
   // per-op middleware, so it can neither be filter-scoped nor payload-sanitized.
   // Reject it unless the caller has explicitly opted out (runWithoutTenant).
-  schema.pre("bulkWrite", function () {
+  schema.pre('bulkWrite', function () {
     if (isBypassing()) {
       return;
     }
     throw new Error(
-      "tenantScope: bulkWrite is not tenant-aware; use scoped updateMany/insertMany, or wrap in runWithoutTenant if cross-tenant is intended",
+      'tenantScope: bulkWrite is not tenant-aware; use scoped updateMany/insertMany, or wrap in runWithoutTenant if cross-tenant is intended',
     );
   });
 
   // estimatedDocumentCount ignores query filters, so it can never be
   // tenant-scoped and would leak a cross-tenant total. Reject it unless the
   // caller has explicitly opted out of tenant scoping (runWithoutTenant).
-  schema.pre<QueryThis>("estimatedDocumentCount", function () {
+  schema.pre<QueryThis>('estimatedDocumentCount', function () {
     if (isBypassing()) {
       return;
     }
     throw new Error(
-      "tenantScope: estimatedDocumentCount is not tenant-aware; use countDocuments instead",
+      'tenantScope: estimatedDocumentCount is not tenant-aware; use countDocuments instead',
     );
   });
 
-  schema.pre<AggregateThis>("aggregate", function (this: AggregateThis) {
+  schema.pre<AggregateThis>('aggregate', function (this: AggregateThis) {
     if (isBypassing()) {
       return;
     }
-    const tenantId = requireTenantId("aggregate");
+    const tenantId = requireTenantId('aggregate');
     const pipeline = this.pipeline() as unknown as Record<string, unknown>[];
     // Reject pipelines that touch foreign collections: the $match below only
     // scopes the source collection, leaving these stages unscoped. Make the
@@ -200,11 +200,11 @@ export function tenantScope(schema: Schema): void {
     pipeline.unshift({ $match: { tenantId: toObjectId(tenantId) } });
   });
 
-  schema.pre<TenantDoc>("save", function (this: TenantDoc) {
+  schema.pre<TenantDoc>('save', function (this: TenantDoc) {
     if (isBypassing()) {
       return;
     }
-    const tenantId = requireTenantId("save");
+    const tenantId = requireTenantId('save');
     if (this.isNew) {
       if (!this.tenantId) {
         this.tenantId = toObjectId(tenantId);
@@ -220,14 +220,14 @@ export function tenantScope(schema: Schema): void {
     }
   });
 
-  schema.pre("insertMany", function (
+  schema.pre('insertMany', function (
     this: unknown,
     docs: InsertManyDoc | InsertManyDoc[],
   ) {
     if (isBypassing()) {
       return;
     }
-    const tenantId = requireTenantId("insertMany");
+    const tenantId = requireTenantId('insertMany');
     const tid = toObjectId(tenantId);
     const list = Array.isArray(docs) ? docs : [docs];
     for (const doc of list) {

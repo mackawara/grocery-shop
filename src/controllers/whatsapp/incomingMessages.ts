@@ -1,18 +1,19 @@
-import { Request, Response } from "express";
-import { logger } from "../../services/logger";
-import {
+import type { Request, Response } from 'express';
+import { logger } from '../../services/logger';
+import type {
   WebhookNotificationBody,
   Text,
   InteractiveMessageNotification,
   OrderMessageNotification,
   ReactionMessageNotification,
-} from "../../types/types";
-import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from "./conversation.controller";
-import { whatsappOrderHandler } from "./whatsappOrderHandler";
-import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
-import { WaInteractiveType, WaMessageType } from "../../models/whatsappMessage.model";
-import { fromUnixTime } from "date-fns";
-import whatsappMessager from "./outgoingMessages";
+} from '../../types/types';
+// eslint-disable-next-line max-len
+import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from './conversation.controller';
+import { whatsappOrderHandler } from './whatsappOrderHandler';
+import { saveWhatsappMessage } from '../../utils/whatsapp.utils';
+import type { WaInteractiveType, WaMessageType } from '../../models/whatsappMessage.model';
+import { fromUnixTime } from 'date-fns';
+import whatsappMessager from './outgoingMessages';
 
 export const incomingMessagesHandler = async (req: Request, res: Response) => {
   res.status(200).json({ success: true });// early return to avoid repeated processing in case of retries from WhatsApp
@@ -27,60 +28,60 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
         const waTimestamp = fromUnixTime(Number(timestamp));
 
         if (await isWhatsAppMessageProcessed(messageId)) {
-          logger.warn("[INCOMING_MESSAGE] : Duplicate message ignored:", messageId);
+          logger.warn('[INCOMING_MESSAGE] : Duplicate message ignored:', messageId);
           return;
         }
 
-        let content = "";
+        let content = '';
         let interactiveType: WaInteractiveType | undefined;
 
         switch (messageType) {
-          case "text": {
+          case 'text': {
             const { text } = messages[0] as Text;
             content = text.body;
             await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
             await textHandler(from, text);
             break;
           }
-          case "interactive": {
+          case 'interactive': {
             const { interactive } = messages[0] as InteractiveMessageNotification;
             interactiveType = interactive.type;
             content = interactive.type;
             await interactiveHandler(from, interactive);
             break;
           }
-          case "order": {
+          case 'order': {
             const { order } = messages[0] as OrderMessageNotification;
             content = `${order.product_items.length} item(s) from catalog ${order.catalog_id}`;
             await whatsappOrderHandler(from, order);
             break;
           }
-          case "reaction": {
+          case 'reaction': {
             const { reaction } = messages[0] as ReactionMessageNotification;
             content = reaction.emoji;
             await reactionHandler(from, reaction);
             break;
           }
           default:
-            logger.warn("[INCOMING_MESSAGE] : Unhandled message type:", messageType, "from:", from);
+            logger.warn('[INCOMING_MESSAGE] : Unhandled message type:', messageType, 'from:', from);
         }
 
         if (content) {
           await saveWhatsappMessage({
             phoneNumber: from,
-            direction: "inbound",
+            direction: 'inbound',
             messageType: messageType as WaMessageType,
             interactiveType,
             content,
             externalId: messageId,
             timestamp: waTimestamp,
-            status: "received",
+            status: 'received',
           });
         }
       }
     }
   } catch (error) {
-    logger.error("[INCOMING_MESSAGE] : Error processing incoming message:", error);
+    logger.error('[INCOMING_MESSAGE] : Error processing incoming message:', error);
   }
 
 };

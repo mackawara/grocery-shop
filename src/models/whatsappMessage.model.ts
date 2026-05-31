@@ -1,19 +1,19 @@
-import type { Document, Types } from "mongoose";
-import mongoose, { Schema } from "mongoose";
-import type { MessageNotification, InteractivePayLoad } from "../types/types";
-import { tenantScope } from "./plugins/tenantScope";
+import type { Document, Types } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import type { MessageNotification, InteractivePayLoad } from '../types/types';
+import { tenantScope } from './plugins/tenantScope';
 
-export type WaMessageDirection = "inbound" | "outbound";
-export type WaMessageType = MessageNotification["type"];
+export type WaMessageDirection = 'inbound' | 'outbound';
+export type WaMessageType = MessageNotification['type'];
 export type WaInteractiveType =
-  | InteractivePayLoad["type"]
-  | "flow"
-  | "button"
-  | "list"
-  | "product_list"
-  | "catalog_message"
-  | "cta_url";
-export type WaMessageStatus = "received" | "sent" | "failed";
+  | InteractivePayLoad['type']
+  | 'flow'
+  | 'button'
+  | 'list'
+  | 'product_list'
+  | 'catalog_message'
+  | 'cta_url';
+export type WaMessageStatus = 'received' | 'sent' | 'failed';
 
 export interface IWhatsappMessage extends Document {
   tenantId: Types.ObjectId;
@@ -29,26 +29,26 @@ export interface IWhatsappMessage extends Document {
 
 const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
   {
-    tenantId: { type: Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     phoneNumber: { type: String, required: true },
-    direction: { type: String, enum: ["inbound", "outbound"], required: true },
+    direction: { type: String, enum: ['inbound', 'outbound'], required: true },
     messageType: {
       type: String,
-      enum: ["text", "interactive", "order", "reaction"],
+      enum: ['text', 'interactive', 'order', 'reaction'],
       required: true,
     },
     interactiveType: {
       type: String,
       enum: [
-        "button_reply",
-        "list_reply",
-        "nfm_reply",
-        "flow",
-        "button",
-        "list",
-        "product_list",
-        "catalog_message",
-        "cta_url",
+        'button_reply',
+        'list_reply',
+        'nfm_reply',
+        'flow',
+        'button',
+        'list',
+        'product_list',
+        'catalog_message',
+        'cta_url',
       ],
       default: null,
     },
@@ -57,7 +57,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
     timestamp: { type: Date, required: true },
     status: {
       type: String,
-      enum: ["received", "sent", "failed"],
+      enum: ['received', 'sent', 'failed'],
       required: true,
     },
   },
@@ -69,4 +69,4 @@ WhatsappMessageSchema.index({ tenantId: 1, externalId: 1 }, { unique: true, spar
 
 WhatsappMessageSchema.plugin(tenantScope);
 
-export default mongoose.model<IWhatsappMessage>("WhatsappMessage", WhatsappMessageSchema);
+export default mongoose.model<IWhatsappMessage>('WhatsappMessage', WhatsappMessageSchema);

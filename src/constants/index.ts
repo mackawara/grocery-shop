@@ -1,5 +1,5 @@
-import * as whatsapp from "./whatsapp";
-import * as models from "./models";
+import * as whatsapp from './whatsapp';
+import * as models from './models';
 
 const constants = {
   whatsapp,

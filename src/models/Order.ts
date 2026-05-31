@@ -1,8 +1,8 @@
 // TODO: Stub model — extend with delivery address, discount, and channel fields before production use
-import type { Document, Types } from "mongoose";
-import mongoose, { Schema } from "mongoose";
-import { OrderStatus, PaymentStatus, DeliveryStatus } from "../constants/models";
-import { tenantScope } from "./plugins/tenantScope";
+import type { Document, Types } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import { OrderStatus, PaymentStatus, DeliveryStatus } from '../constants/models';
+import { tenantScope } from './plugins/tenantScope';
 
 export { OrderStatus, PaymentStatus, DeliveryStatus };
 
@@ -29,9 +29,9 @@ export interface IOrder extends Document {
 
 const OrderSchema = new Schema<IOrder>(
   {
-    tenantId: { type: Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     orderNumber: { type: String, required: true },
-    user: { type: Schema.Types.ObjectId, ref: "User" },
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
     totalAmount: { type: Number, required: true, default: 0 },
     status: {
       type: String,
@@ -40,7 +40,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     orderDate: { type: Date, required: true },
     notes: { type: String },
-    orderItems: [{ type: Schema.Types.ObjectId, ref: "OrderItem" }],
+    orderItems: [{ type: Schema.Types.ObjectId, ref: 'OrderItem' }],
     paymentDetails: {
       status: { type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING },
       method: { type: String },
@@ -54,4 +54,4 @@ OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
 
 OrderSchema.plugin(tenantScope);
 
-export default mongoose.model<IOrder>("Order", OrderSchema);
+export default mongoose.model<IOrder>('Order', OrderSchema);

@@ -1,8 +1,8 @@
-import { redisClient } from "../../services/redis";
-import { logger } from "../../services/logger";
-import { tenantKey } from "../../utils/tenantKey";
+import { redisClient } from '../../services/redis';
+import { logger } from '../../services/logger';
+import { tenantKey } from '../../utils/tenantKey';
 
-const TAG = "REDIS_CONTROLLER";
+const TAG = 'REDIS_CONTROLLER';
 const DEFAULT_EXPIRY = 180;
 
 type SetResult = { success: true } | { success: false; error: string };
@@ -19,7 +19,7 @@ export const setRedisHashKeyValuePair = async ({
   expiry?: number;
 }): Promise<SetResult> => {
   if (!hashName || !key || !value) {
-    return { success: false, error: "hashName, key, and value are required" };
+    return { success: false, error: 'hashName, key, and value are required' };
   }
 
   const scopedHash = tenantKey(hashName);
@@ -78,7 +78,7 @@ export const deleteRedisHashField = async (
   key: string,
 ): Promise<SetResult> => {
   if (!hashName || !key) {
-    return { success: false, error: "hashName and key are required" };
+    return { success: false, error: 'hashName and key are required' };
   }
 
   const scopedHash = tenantKey(hashName);
@@ -98,7 +98,7 @@ export const isMessageProcessed = async (
 ): Promise<boolean> => {
   const scopedKey = tenantKey(key);
   try {
-    const result = await redisClient.set(scopedKey, "1", { NX: true, EX: ttlSeconds });
+    const result = await redisClient.set(scopedKey, '1', { NX: true, EX: ttlSeconds });
     return result === null;
   } catch (error) {
     // Fail closed: if we can't confirm dedup (e.g. Redis outage), treat the
@@ -112,7 +112,7 @@ export const isMessageProcessed = async (
 
 export const deleteRedisHash = async (hashName: string): Promise<SetResult> => {
   if (!hashName) {
-    return { success: false, error: "hashName is required" };
+    return { success: false, error: 'hashName is required' };
   }
 
   const scopedHash = tenantKey(hashName);

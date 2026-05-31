@@ -1,13 +1,13 @@
-import { Request, Response, NextFunction } from "express";
-import type { Types } from "mongoose";
-import Tenant from "../../models/Tenant";
-import { TenantStatus } from "../../constants/models";
+import type { Request, Response, NextFunction } from 'express';
+import type { Types } from 'mongoose';
+import Tenant from '../../models/Tenant';
+import { TenantStatus } from '../../constants/models';
 import {
   runWithTenant,
   runWithoutTenant,
-} from "../../context/tenantContext";
-import { logger } from "../../services/logger";
-import type { WebhookNotificationBody } from "../../types/types";
+} from '../../context/tenantContext';
+import { logger } from '../../services/logger';
+import type { WebhookNotificationBody } from '../../types/types';
 
 export const whatsappTenantResolver = async (
   req: Request,
@@ -20,7 +20,7 @@ export const whatsappTenantResolver = async (
 
   if (!phoneNumberId) {
     logger.warn(
-      "[whatsappTenantResolver] no phone_number_id in webhook payload — acking 200",
+      '[whatsappTenantResolver] no phone_number_id in webhook payload — acking 200',
     );
     res.status(200).json({ success: true });
     return;
@@ -29,7 +29,7 @@ export const whatsappTenantResolver = async (
   let tenant;
   try {
     tenant = await runWithoutTenant(
-      "whatsapp webhook tenant resolution",
+      'whatsapp webhook tenant resolution',
       `Tenant.findOne({ whatsappPhoneNumberId: ${phoneNumberId} })`,
       () => Tenant.findOne({ whatsappPhoneNumberId: phoneNumberId }),
     );

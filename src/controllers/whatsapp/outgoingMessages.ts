@@ -1,16 +1,16 @@
-import axios from "axios";
-import { logger } from "../../services/logger";
-import { CONFIG } from "../../config";
-import constants from "../../constants";
-import UTILS from "../../utils";
-import { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSection, ReplyButtonObject,} from "../../types/types";
-import { isEmpty } from "lodash";
+import axios from 'axios';
+import { logger } from '../../services/logger';
+import { CONFIG } from '../../config';
+import constants from '../../constants';
+import UTILS from '../../utils';
+import type { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSection, ReplyButtonObject} from '../../types/types';
+import { isEmpty } from 'lodash';
 
 
-import { saveWhatsappMessage } from "../../utils/whatsapp.utils";
+import { saveWhatsappMessage } from '../../utils/whatsapp.utils';
 
 
-const whatsappApiVersion = "v21.0";
+const whatsappApiVersion = 'v21.0';
 
 export interface MessageResult {
   success: boolean;
@@ -18,8 +18,8 @@ export interface MessageResult {
 }
 
 export const messagesEndpointUrl: string = `https://graph.facebook.com/${whatsappApiVersion}/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages?access_token=${CONFIG.WHATSAPP_SYSTEM_TOKEN}`;
-const headers = { "Content-Type": "application/json" };
-const TAG = "[WHATSAPP-MESSAGING]";
+const headers = { 'Content-Type': 'application/json' };
+const TAG = '[WHATSAPP-MESSAGING]';
 
 const sendFreeFormTextMessage = async (
   receivingNumber: string,
@@ -28,14 +28,14 @@ const sendFreeFormTextMessage = async (
   try {
 
     const response = await axios({
-      method: "POST",
+      method: 'POST',
       url: messagesEndpointUrl,
-      headers: headers,
+      headers,
       data: {
         recipient_type: constants.whatsapp.INDIVIDUAL,
         messaging_product: constants.whatsapp.WHATSAPP,
         to: receivingNumber,
-        type: "text",
+        type: 'text',
         text: { body: text },
       },
     });
@@ -46,29 +46,29 @@ const sendFreeFormTextMessage = async (
 
     await saveWhatsappMessage({
       phoneNumber: receivingNumber,
-      direction: "outbound",
-      messageType: "text",
+      direction: 'outbound',
+      messageType: 'text',
       content: text,
       externalId: response.data?.messages?.[0]?.id,
       timestamp: new Date(),
-      status: "sent",
+      status: 'sent',
     });
 
     return { success: true };
 
   } catch (err: any) {
     if (UTILS.isFacebookAPIError(err)) {
-      const errorMessage = err.response?.data?.error?.message || "Unknown Facebook API Error";
+      const errorMessage = err.response?.data?.error?.message || 'Unknown Facebook API Error';
       logger.error(errorMessage);
     }
 
     await saveWhatsappMessage({
       phoneNumber: receivingNumber,
-      direction: "outbound",
-      messageType: "text",
+      direction: 'outbound',
+      messageType: 'text',
       content: text,
       timestamp: new Date(),
-      status: "failed",
+      status: 'failed',
     });
 
     return { success: false, error: err.message };
@@ -82,7 +82,7 @@ const sendInteractive = async (
 ): Promise<MessageResult> => {
   try {
     const result = await axios({
-      method: "POST",
+      method: 'POST',
       url: messagesEndpointUrl,
       data: {
         recipient_type: constants.whatsapp.INDIVIDUAL,
@@ -101,13 +101,13 @@ const sendInteractive = async (
 
     await saveWhatsappMessage({
       phoneNumber: receivingNumber,
-      direction: "outbound",
-      messageType: "interactive",
+      direction: 'outbound',
+      messageType: 'interactive',
       interactiveType: interactiveObject.type,
       content: interactiveObject.body?.text ?? interactiveObject.type,
       externalId: result.data?.messages?.[0]?.id,
       timestamp: new Date(),
-      status: "sent",
+      status: 'sent',
     });
 
     return { success: true };
@@ -120,12 +120,12 @@ const sendInteractive = async (
 
     await saveWhatsappMessage({
       phoneNumber: receivingNumber,
-      direction: "outbound",
-      messageType: "interactive",
+      direction: 'outbound',
+      messageType: 'interactive',
       interactiveType: interactiveObject.type,
       content: interactiveObject.body?.text ?? interactiveObject.type,
       timestamp: new Date(),
-      status: "failed",
+      status: 'failed',
     });
 
     return { success: false, error: err.message };
@@ -158,20 +158,20 @@ export function createFlowInteractive(params: {
       isEmpty(initialData) || initialData === undefined ? null : initialData,
   };
   const interactive: InteractiveFlow = {
-    type: "flow",
+    type: 'flow',
     //sub_type: "interactive",
     body: {
       text: bodyText.substring(0, 1024), // Enforce WhatsApp limit
     },
     action: {
-      name: "flow",
+      name: 'flow',
       parameters: {
-        mode: "published",
-        flow_message_version: "3",
+        mode: 'published',
+        flow_message_version: '3',
         flow_token: flowToken,
         flow_id: flowId,
         flow_cta: flowCta,
-        flow_action: "navigate",
+        flow_action: 'navigate',
         flow_action_payload: {
           screen: initialScreen,
           data: isEmpty(initialData) ? undefined : initialData,
@@ -183,7 +183,7 @@ export function createFlowInteractive(params: {
   // Add header if provided
   if (headerText) {
     interactive.header = {
-      type: "text",
+      type: 'text',
       text: headerText.substring(0, 60), // Enforce WhatsApp limit
     };
   }
@@ -200,7 +200,7 @@ export function createFlowInteractive(params: {
 
 
 interface SendWhatsAppCatalogMessage {
-  name: "catalog_message";
+  name: 'catalog_message';
   parameters?: {
     thumbnail_product_retailer_id?: string; // Optional: If you want to feature a specific product thumbnail
     // catalog_id is part of the main action object for some interactive types, but for 'catalog_message' it's often implied or handled differently.
@@ -223,28 +223,28 @@ export interface WhatsAppSendCatalogMessageParams {
  */
 export async function sendWhatsAppCatalogMessage({
   phone,
-  bodyText = "Check out our catalog!",
+  bodyText = 'Check out our catalog!',
   thumbnailProductRetailerId,
   footer,
 }: WhatsAppSendCatalogMessageParams): Promise<MessageResult> {
   try {
     const url = `https://graph.facebook.com/v24.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
-    const cleanedPhoneNumber = phone.replace(/\D/g, "");
+    const cleanedPhoneNumber = phone.replace(/\D/g, '');
     if (!CONFIG.WHATSAPP_SYSTEM_TOKEN || !phone) {
-      logger.error("WhatsApp credentials not configured for catalog message");
-      return { success: false, error: "WhatsApp credentials not configured" };
+      logger.error('WhatsApp credentials not configured for catalog message');
+      return { success: false, error: 'WhatsApp credentials not configured' };
     }
 
     const interactivePayload: {
-      type: "catalog_message";
+      type: 'catalog_message';
       body: { text: string };
       action: SendWhatsAppCatalogMessage;
       footer?: { text: string };
     } = {
-      type: "catalog_message",
+      type: 'catalog_message',
       body: { text: bodyText.substring(0, 1024) },
-      action: { name: "catalog_message" },
-      footer: { text: footer ? footer.substring(0, 60) : "Powered by Beauty Naomi" },
+      action: { name: 'catalog_message' },
+      footer: { text: footer ? footer.substring(0, 60) : 'Powered by Beauty Naomi' },
     };
 
     if (thumbnailProductRetailerId) {
@@ -254,51 +254,51 @@ export async function sendWhatsAppCatalogMessage({
     }
 
     const response = await axios(url, {
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${CONFIG.WHATSAPP_SYSTEM_TOKEN}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       data: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
         to: cleanedPhoneNumber,
-        type: "interactive",
+        type: 'interactive',
         interactive: interactivePayload,
       }),
     });
 
     if (response.status !== 200) {
       const errorData = response.data;
-      logger.error("WhatsApp API error for catalog_message:", errorData.error || errorData);
-      return { success: false, error: errorData?.error?.message ?? "Unknown error" };
+      logger.error('WhatsApp API error for catalog_message:', errorData.error || errorData);
+      return { success: false, error: errorData?.error?.message ?? 'Unknown error' };
     }
 
     logger.info(`WhatsApp catalog_message sent successfully to ${phone}`);
 
     await saveWhatsappMessage({
       phoneNumber: cleanedPhoneNumber,
-      direction: "outbound",
-      messageType: "interactive",
-      interactiveType: "catalog_message",
+      direction: 'outbound',
+      messageType: 'interactive',
+      interactiveType: 'catalog_message',
       content: bodyText,
       externalId: response.data?.messages?.[0]?.id,
       timestamp: new Date(),
-      status: "sent",
+      status: 'sent',
     });
 
     return { success: true };
   } catch (error: any) {
-    logger.error("Error sending WhatsApp catalog_message:", error);
+    logger.error('Error sending WhatsApp catalog_message:', error);
 
     await saveWhatsappMessage({
       phoneNumber: phone,
-      direction: "outbound",
-      messageType: "interactive",
-      interactiveType: "catalog_message",
+      direction: 'outbound',
+      messageType: 'interactive',
+      interactiveType: 'catalog_message',
       content: bodyText,
       timestamp: new Date(),
-      status: "failed",
+      status: 'failed',
     });
 
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -320,7 +320,7 @@ interface ReplyList {
 
 const messageWithReplyList = (listObject: ReplyList): InteractiveList => {
   const message: InteractiveList = {
-    type: "list",
+    type: 'list',
     body: {
       text: listObject.text,
     },
@@ -339,7 +339,7 @@ interface ReplyButtons {
 
 const messageWithReplyButtons = (buttonsObject: ReplyButtons): Interactive => {
   const message: Interactive = {
-    type: "button",
+    type: 'button',
     body: {
       text: buttonsObject.text,
     },

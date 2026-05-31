@@ -1,6 +1,6 @@
-import { AsyncLocalStorage } from "node:async_hooks";
-import type { Types } from "mongoose";
-import { logger, setTenantLabelProvider } from "../services/logger";
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Types } from 'mongoose';
+import { logger, setTenantLabelProvider } from '../services/logger';
 
 export interface TenantContext {
   tenantId: string;
@@ -15,7 +15,7 @@ export class TenantContextMissingError extends Error {
     super(
       `Tenant context missing for operation: ${operation}. Wrap the call in runWithTenant() or runWithoutTenant().`,
     );
-    this.name = "TenantContextMissingError";
+    this.name = 'TenantContextMissingError';
   }
 }
 
@@ -34,7 +34,7 @@ export const runWithoutTenant = <T>(
   logger.warn(
     `[tenantContext] BYPASS reason="${reason}" query="${queryDescription}"`,
   );
-  return storage.run({ tenantId: "", bypass: true }, fn);
+  return storage.run({ tenantId: '', bypass: true }, fn);
 };
 
 export const getTenantContext = (): TenantContext | undefined =>
@@ -78,10 +78,10 @@ export const getTenantSlug = (): string | undefined => {
 export const getTenantLogLabel = (): string => {
   const ctx = storage.getStore();
   if (!ctx) {
-    return "no-tenant";
+    return 'no-tenant';
   }
   if (ctx.bypass) {
-    return "bypass";
+    return 'bypass';
   }
   return ctx.tenantSlug ?? ctx.tenantId;
 };
@@ -95,7 +95,7 @@ setTenantLabelProvider(() => {
     return undefined;
   }
   if (ctx.bypass) {
-    return "bypass";
+    return 'bypass';
   }
   return ctx.tenantSlug ?? ctx.tenantId;
 });
