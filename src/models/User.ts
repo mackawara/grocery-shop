@@ -4,7 +4,6 @@ import { UserRole, UserStatus } from '../constants/models';
 import { tenantScope } from './plugins/tenantScope';
 
 export { UserRole, UserStatus };
-
 export interface IUser extends Document {
   tenantId: Types.ObjectId;
   phoneNumber: string;
