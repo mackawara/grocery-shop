@@ -19,6 +19,7 @@ const mandatoryEnvironmentConstants = [
   'MONGODB_HOST',
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_SYSTEM_TOKEN',
+  'WHATSAPP_FLOW_PRIVATE_KEY',
   ...(isLocal ? ['NGROK_DOMAIN'] : []),
 ];
 
@@ -62,6 +63,8 @@ export const CONFIG = {
   MONGODB_HOST: process.env.MONGODB_HOST || '',
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
   WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || '',
+  WHATSAPP_FLOW_PRIVATE_KEY: process.env.WHATSAPP_FLOW_PRIVATE_KEY || '',
+  WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: process.env.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE || '',
   NGROK_DOMAIN: process.env.NGROK_DOMAIN || '',
 };
 logger.warn(
