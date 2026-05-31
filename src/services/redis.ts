@@ -1,9 +1,10 @@
-import { createClient, RedisClientType } from "redis";
+import type { RedisClientType } from 'redis';
+import { createClient } from 'redis';
 
-import { CONFIG } from "../config";
-import { logger } from "./logger";
+import { CONFIG } from '../config';
+import { logger } from './logger';
 
-const TAG = "REDIS";
+const TAG = 'REDIS';
 
 export class RedisService {
   private static instance: RedisService;
@@ -34,7 +35,7 @@ export class RedisService {
   }
 
   private setupListeners() {
-    this.client.on("connect", () => {
+    this.client.on('connect', () => {
       this.isConnected = true;
       logger.info(
         `[${TAG}] Connected to Redis. HOST: ${CONFIG.REDIS_HOST}. PORT: ${CONFIG.REDIS_HOST_PORT}`,
@@ -44,17 +45,18 @@ export class RedisService {
       }
     });
 
-    this.client.on("reconnecting", () => {
+    this.client.on('reconnecting', () => {
       logger.info(
+        // eslint-disable-next-line max-len
         `[${TAG}] Reconnecting to Redis. HOST: ${CONFIG.REDIS_HOST}. PORT: ${CONFIG.REDIS_HOST_PORT}`,
       );
     });
 
-    this.client.on("error", (err) => {
+    this.client.on('error', (err) => {
       logger.warn(`[${TAG}] Error connecting to Redis: ${err}`);
     });
 
-    this.client.on("end", () => {
+    this.client.on('end', () => {
       this.isConnected = false;
       logger.warn(`[${TAG}] Redis connection ended`);
     });

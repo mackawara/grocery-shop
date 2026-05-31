@@ -1,20 +1,20 @@
-import { format } from "date-fns";
-import fs from "fs";
-import util from "util";
-import { createLogger, transports, format as winstonFormat } from "winston";
+import { format } from 'date-fns';
+import fs from 'fs';
+import util from 'util';
+import { createLogger, transports, format as winstonFormat } from 'winston';
 
-const { colorize, combine, simple, timestamp } = winstonFormat;
+const { colorize, combine, simple } = winstonFormat;
 
-type LogLevel = "error" | "warn" | "info" | "verbose" | "debug" | "silly";
+type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' | 'silly';
 const LEVELS: LogLevel[] = [
-  "error",
-  "warn",
-  "info",
-  "verbose",
-  "debug",
-  "silly",
+  'error',
+  'warn',
+  'info',
+  'verbose',
+  'debug',
+  'silly',
 ];
-const LEVEL: LogLevel = "debug";
+const LEVEL: LogLevel = 'debug';
 
 const winstonLogger = createLogger({
   format: combine(
@@ -23,7 +23,7 @@ const winstonLogger = createLogger({
   ),
   transports: [
     new transports.Console({
-      level: process.env.NODE_ENV === "production" ? LEVEL : "silly",
+      level: process.env.NODE_ENV === 'production' ? LEVEL : 'silly',
     }),
   ],
 });
@@ -40,22 +40,22 @@ export const setTenantLabelProvider = (fn: TenantLabelProvider): void => {
 
 function tenantPrefix(): string {
   const label = tenantLabelProvider();
-  return label ? `[tenant=${label}] ` : "";
+  return label ? `[tenant=${label}] ` : '';
 }
 
-const writeLogType = (logLevel: LogLevel, writeSync = false) => {
+const writeLogType = (logLevel: LogLevel, writeSync = false) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return function (...theArguments: any[]) {
+   function (...theArguments: any[]) {
     const args = Array.from(theArguments);
 
     const loggerMessage = args
-      .map((_) => (typeof _ === "string" ? _ : _?.message || JSON.stringify(_)))
-      .join(" ");
+      .map((_) => (typeof _ === 'string' ? _ : _?.message || JSON.stringify(_)))
+      .join(' ');
     const prefix = tenantPrefix();
-    if (process.env.NODE_ENV === "test") {
-      const fileName = "testing-errors.log";
-      const entry = `${format(Date.now(), "yyyy-MM-dd HH:mm:ss")} ${logLevel.toUpperCase()} ${prefix}${loggerMessage} \n`;
-      const flag = { flag: "a" };
+    if (process.env.NODE_ENV === 'test') {
+      const fileName = 'testing-errors.log';
+      const entry = `${format(Date.now(), 'yyyy-MM-dd HH:mm:ss')} ${logLevel.toUpperCase()} ${prefix}${loggerMessage} \n`;
+      const flag = { flag: 'a' };
       if (writeSync) {
         fs.writeFileSync(fileName, entry, flag);
         return;
@@ -69,22 +69,22 @@ const writeLogType = (logLevel: LogLevel, writeSync = false) => {
     winstonLogger[logLevel](prefix + util.format(...args));
 
     if (
-      process.env.NODE_ENV === "production" ||
-      process.env.NODE_ENV === "staging"
+      process.env.NODE_ENV === 'production' ||
+      process.env.NODE_ENV === 'staging'
     ) {
       if (LEVELS.indexOf(logLevel) >= LEVELS.indexOf(LEVEL)) {
         return;
       }
     }
-  };
-};
+  }
+;
 
 export const logger = {
-  silly: writeLogType("silly"),
-  debug: writeLogType("debug"),
-  verbose: writeLogType("verbose"),
-  info: writeLogType("info"),
-  warn: writeLogType("warn"),
-  error: writeLogType("error"),
-  errorSync: writeLogType("error", true),
+  silly: writeLogType('silly'),
+  debug: writeLogType('debug'),
+  verbose: writeLogType('verbose'),
+  info: writeLogType('info'),
+  warn: writeLogType('warn'),
+  error: writeLogType('error'),
+  errorSync: writeLogType('error', true),
 };

@@ -1,11 +1,11 @@
-import type { Document} from "mongoose";
-import mongoose, { Schema } from "mongoose";
+import type { Document} from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 import {
   TenantStatus,
   TenantPlan,
   PaymentMethod,
   DeliveryMethod,
-} from "../constants/models";
+} from '../constants/models';
 
 export { TenantStatus, TenantPlan, PaymentMethod, DeliveryMethod };
 
@@ -45,8 +45,8 @@ const slugify = (input: string): string =>
   input
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 const TenantSchema = new Schema<ITenant>(
   {
@@ -97,13 +97,13 @@ const TenantSchema = new Schema<ITenant>(
 // one will fail with a duplicate-key error (E11000) on the unique slug index.
 // The tenant create controller must catch that error and retry the save so the
 // hook re-runs and picks the next free suffix.
-TenantSchema.pre<ITenant>("validate", async function () {
+TenantSchema.pre<ITenant>('validate', async function () {
   if (this.slug || !this.displayName) {
     return;
   }
   const base = slugify(this.displayName);
   if (!base) {
-    throw new Error("Cannot derive slug from displayName");
+    throw new Error('Cannot derive slug from displayName');
   }
   const TenantModel = this.constructor as mongoose.Model<ITenant>;
   let candidate = base;
@@ -117,4 +117,4 @@ TenantSchema.pre<ITenant>("validate", async function () {
   this.slug = candidate;
 });
 
-export default mongoose.model<ITenant>("Tenant", TenantSchema);
+export default mongoose.model<ITenant>('Tenant', TenantSchema);

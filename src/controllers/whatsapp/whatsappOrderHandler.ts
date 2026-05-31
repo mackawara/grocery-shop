@@ -1,10 +1,11 @@
-import mongoose, { Types } from "mongoose";
-import { logger } from "../../services/logger";
-import { Order } from "../../types/types";
-import whatsappMessager from "./outgoingMessages";
-import OrderModel from "../../models/Order";
-import { OrderItem } from "../../models/OrderItem";
-import { setRedisHashKeyValuePair } from "../redis/redis.controller";
+import type { Types } from 'mongoose';
+import mongoose from 'mongoose';
+import { logger } from '../../services/logger';
+import type { Order } from '../../types/types';
+import whatsappMessager from './outgoingMessages';
+import OrderModel from '../../models/Order';
+import { OrderItem } from '../../models/OrderItem';
+import { setRedisHashKeyValuePair } from '../redis/redis.controller';
 // import User from "../../models/User"; // TODO: uncomment once User model is fully defined
 
 const ORDER_SESSION_TTL_SECONDS = 1800; // 30 minutes
@@ -16,6 +17,7 @@ interface OrderItemSummary {
 }
 
 export const whatsappOrderHandler = async (from: string, order: Order): Promise<void> => {
+  // eslint-disable-next-line max-len
   logger.info(`[ORDER_MESSAGE] Processing catalog order from: ${from} | catalog: ${order.catalog_id} | items: ${order.product_items.length}`);
 
   const session = await mongoose.startSession();

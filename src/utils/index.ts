@@ -1,7 +1,6 @@
-import { FacebookAPIError } from "../types/types";
+import type { FacebookAPIError } from '../types/types';
 
-const isFacebookAPIError = (error: unknown): error is FacebookAPIError => {
-  return (
+const isFacebookAPIError = (error: unknown): error is FacebookAPIError => (
     typeof error === 'object' &&
     error !== null &&
     'response' in error &&
@@ -9,7 +8,6 @@ const isFacebookAPIError = (error: unknown): error is FacebookAPIError => {
     'data' in (error as FacebookAPIError).response &&
     'error' in (error as FacebookAPIError).response.data
   );
-};
 
 const UTILS = {
     isFacebookAPIError,

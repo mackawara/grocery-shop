@@ -28,17 +28,17 @@ export interface BaseMessageNotificationPayload {
 }
 export interface InteractiveMessageNotification
   extends BaseMessageNotificationPayload {
-  type: "interactive";
+  type: 'interactive';
   interactive: InteractivePayLoad;
 }
 export interface OrderMessageNotification
   extends BaseMessageNotificationPayload {
-  type: "order";
+  type: 'order';
   order: Order;
 }
 export interface ReactionMessageNotification
   extends BaseMessageNotificationPayload {
-  type: "reaction";
+  type: 'reaction';
   reaction: {
     message_id: string; //"MESSAGE_ID",
     emoji: string; //"EMOJI name"
@@ -56,7 +56,7 @@ export interface InteractiveListReplyNotifications {
     title: string;
     description: string; //  "list_reply_description"
   };
-  type: "list_reply";
+  type: 'list_reply';
 }
 
 export interface InteractiveButtonReplyNotification {
@@ -64,7 +64,7 @@ export interface InteractiveButtonReplyNotification {
     id: string; // unique-button-identifier-here,
     title: string; //button-text,
   };
-  type: "button_reply";
+  type: 'button_reply';
 }
 
 export interface Pricing {
@@ -79,7 +79,7 @@ export interface Contact {
 }
 
 export interface Text extends BaseMessageNotificationPayload {
-  type: "text";
+  type: 'text';
   text: { body: string };
 }
 
@@ -126,7 +126,7 @@ export interface OrderItems {
 }
 
 export interface InteractiveButtonReplyPayload {
-  type: "button_reply";
+  type: 'button_reply';
   button_reply: {
     id: string;
     title: string; //Button label text
@@ -141,7 +141,7 @@ export type InteractivePayLoad =
 
 export interface InteractiveNfmReplyNotification {
   nfm_reply: Nfm_Reply;
-  type: "nfm_reply";
+  type: 'nfm_reply';
 }
 
 export type FlowsForm = Enquiry_Feedback_Form | Voucher_Purchase_Form;
@@ -150,7 +150,7 @@ export type FlowResponseObject = {
 };
 
 export interface Enquiry_Feedback_Form {
-  wouldYouRecommend: "yes" | "no";
+  wouldYouRecommend: 'yes' | 'no';
   site: string;
   feedbackComment: string;
   flow_token: string;
@@ -158,7 +158,7 @@ export interface Enquiry_Feedback_Form {
 export interface Voucher_Purchase_Form {
   location: string;
   voucherType: string;
-  payment_method: "ecocash";
+  payment_method: 'ecocash';
   mobile_payment_number: string;
   flow_token: string;
 }
@@ -169,8 +169,8 @@ export interface Balance_Check_Form {
 }
 export interface Nfm_Reply {
   response_json: string;
-  body: "Sent";
-  name: "flow";
+  body: 'Sent';
+  name: 'flow';
 }
 export interface Metadata {
   display_phone_number: string;
@@ -200,7 +200,7 @@ export interface Profile {
 }
 
 export interface TextObject {
-  type: "text";
+  type: 'text';
   text: string;
 }
 
@@ -214,35 +214,35 @@ export type BaseInteractiveObject = {
   footer?: { text: string };
 };
 export interface ImageHeader {
-  type: "image";
+  type: 'image';
   image: { link: string }; // Required when type is "image"
   caption?: string; // Optional, can be used with image type
 }
 
 export interface VideoHeader {
-  type: "video";
+  type: 'video';
   video: { link: string }; // Required when type is "video"
   caption?: string; // Optional, can be used with video type
 }
 
 export interface DocumentHeader {
-  type: "document";
+  type: 'document';
   document: { link: string }; // Required when type is "document"
   caption?: string; // Optional, not commonly used with document
 }
 
 export interface StickerHeader {
-  type: "sticker";
+  type: 'sticker';
   sticker: { link: string }; // Required when type is "sticker"
 }
 
 export interface AudioHeader {
-  type: "audio";
+  type: 'audio';
   audio: { link: string }; // Required when type is "audio"
 }
 
 export interface TextHeader {
-  type: "text";
+  type: 'text';
   text: string;
 }
 
@@ -270,15 +270,15 @@ export interface TemplateParamButton {
 }
 export interface TemplateComponentParameter {
   type:
-    | "text"
-    | "action"
-    | "button"
-    | "currency"
-    | "date_time"
-    | "image"
-    | "header"
-    | "body"
-    | "footer";
+    | 'text'
+    | 'action'
+    | 'button'
+    | 'currency'
+    | 'date_time'
+    | 'image'
+    | 'header'
+    | 'body'
+    | 'footer';
   sub_type?: string;
   index?: string;
   image?: ImageHeader;
@@ -300,13 +300,13 @@ export interface FreeFormText {
 }
 
 export interface TemplateComponentsPostBody {
-  type: "header" | "body" | "footer" | "button";
+  type: 'header' | 'body' | 'footer' | 'button';
   sub_type?: string;
   index?: string;
   parameters: TemplateComponentParameter[];
 }
 export interface ReplyButtonObject {
-  type: "reply";
+  type: 'reply';
   reply: {
     id: string;
     title: string;
@@ -327,14 +327,14 @@ export type Interactive =
   | CatalogMessage;
 
 export interface InteractiveList extends BaseInteractiveObject {
-  type: "list";
+  type: 'list';
   action: {
     sections: InteractiveActionSection[];
     button: string; // this is the button label that will be shown on the button
   };
 }
 export interface InteractiveProductList extends BaseInteractiveObject {
-  type: "product_list";
+  type: 'product_list';
   action: {
     sections: InteractiveActionSection[];
     button: string; // this is the button label that will be shown on the button
@@ -342,12 +342,12 @@ export interface InteractiveProductList extends BaseInteractiveObject {
 }
 
 export interface CatalogMessage {
-  type: "catalog_message";
+  type: 'catalog_message';
   body: {
     text: string;
   };
   action: {
-    name: "catalog_message";
+    name: 'catalog_message';
 
     /* Parameters object is optional but  preferable if you want to specify the thumbnail to be used */
     parameters?: {
@@ -361,9 +361,9 @@ export interface CatalogMessage {
   };
 }
 export interface InteractiveCTAReply extends BaseInteractiveObject {
-  type: "cta_url";
+  type: 'cta_url';
   action: {
-    name: "cta_url";
+    name: 'cta_url';
     parameters: {
       display_text: string; //Button labe;
       url: string;
@@ -387,18 +387,18 @@ export interface InteractiveActionSection {
   rows: ActionSectionRows[];
 }
 export interface InteractiveFlow extends BaseInteractiveObject {
-  type: "flow";
+  type: 'flow';
 
   index?: string;
   action: {
-    name: "flow";
+    name: 'flow';
     parameters: {
-      mode?: "draft" | "published"; // Optional for Flows Messages. Default: published.
-      flow_message_version: "3"; // Required for Flows Messages. Must be "3".
+      mode?: 'draft' | 'published'; // Optional for Flows Messages. Default: published.
+      flow_message_version: '3'; // Required for Flows Messages. Must be "3".
       flow_token: string; // Unique identifier generated by us .
       flow_id: string; //Unique identifier provided by WhatsApp.
       flow_cta: string; // Required for Flows Messages. CTA button text.
-      flow_action?: "navigate" | "data_exchange"; // Default: navigate.
+      flow_action?: 'navigate' | 'data_exchange'; // Default: navigate.
       flow_action_payload?: {
         screen: string; // Required if flow_action is navigate. ID of the first screen.
         data?: Record<string, unknown>; // Optional. Input data for the first screen. Must be a non-empty object.
@@ -407,7 +407,7 @@ export interface InteractiveFlow extends BaseInteractiveObject {
   };
 }
 export interface InteractiveReplyButtonPost extends BaseInteractiveObject {
-  type: "button";
+  type: 'button';
   action: { buttons: ReplyButtonObject[] };
 }
 export interface FacebookAPIError {
@@ -432,12 +432,12 @@ export interface BaseInteractiveActionObject {
 
   catalog_id?: string; // Required for Single-Product and Multi-Product Messages. Unique Facebook catalog ID.
   product_retailer_id?: string; // Required for Single-Product and Multi-Product Messages.
-  mode?: "draft" | "published"; // Optional for Flows Messages. Default: published.
-  flow_message_version?: "3"; // Required for Flows Messages. Must be "3".
+  mode?: 'draft' | 'published'; // Optional for Flows Messages. Default: published.
+  flow_message_version?: '3'; // Required for Flows Messages. Must be "3".
   flow_token?: string; // Required for Flows Messages. Unique identifier generated by the business.
   flow_id?: string; // Required for Flows Messages. Unique identifier provided by WhatsApp.
   flow_cta?: string; // Required for Flows Messages. CTA button text.
-  flow_action?: "navigate" | "data_exchange"; // Optional for Flows Messages. Default: navigate.
+  flow_action?: 'navigate' | 'data_exchange'; // Optional for Flows Messages. Default: navigate.
   flow_action_payload?: {
     screen: string; // Required if flow_action is navigate. ID of the first screen.
     data?: Record<string, unknown>; // Optional. Input data for the first screen. Must be a non-empty object.
@@ -447,7 +447,7 @@ export interface BaseInteractiveActionObject {
 
 export interface InteractiveBaseObject {
   header?: {
-    type: "text" | "image" | "document" | "video";
+    type: 'text' | 'image' | 'document' | 'video';
     text?: string;
     image?: { link: string };
     document?: { link: string; filename?: string };
@@ -462,16 +462,16 @@ export interface InteractiveBaseObject {
 }
 
 export interface InteractiveFlowObject extends InteractiveBaseObject {
-  type: "flow";
+  type: 'flow';
   action: {
-    name: "flow";
+    name: 'flow';
     parameters: {
-      mode?: "draft" | "published";
-      flow_message_version: "3";
+      mode?: 'draft' | 'published';
+      flow_message_version: '3';
       flow_token?: string;
       flow_id: string;
       flow_cta: string;
-      flow_action?: "navigate" | "data_exchange";
+      flow_action?: 'navigate' | 'data_exchange';
       flow_action_payload?: {
         screen: string;
         data?: Record<string, unknown>;
@@ -493,21 +493,21 @@ export interface IVoucher {
   _id: string;
   admin_name: string;
   used: 0 | 1;
-  status: "VALID_ONE" | "EXPIRED";
+  status: 'VALID_ONE' | 'EXPIRED';
   status_expires: number;
 }
 export interface FLOW_TOKENS {
   saleFlow: string;
 }
 export const FLOW_TOKENS = {
-  saleFlow: "voucher_purchase_flow",
+  saleFlow: 'voucher_purchase_flow',
 } as const;
 export type FlowToken = (typeof FLOW_TOKENS)[keyof typeof FLOW_TOKENS];
 export function hasProperty<K extends string>(
   data: unknown,
-  prop: K
+  prop: K,
 ): data is { [key in K]: unknown } {
-  return typeof data === "object" && data !== null && prop in data;
+  return typeof data === 'object' && data !== null && prop in data;
 }
 
 export interface FlowRequest {
@@ -568,7 +568,7 @@ export interface PaymentDetails {
   phoneNumber: string;
   method: string;
   orderNumber: string;
-  
+
 }
 
 export type TCreateService = {
