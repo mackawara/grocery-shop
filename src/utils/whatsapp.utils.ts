@@ -22,6 +22,7 @@ export interface WhatsappMessagePayload {
 
 export const saveWhatsappMessage = async (data: WhatsappMessagePayload): Promise<void> => {
   try {
+    logger.info(`${TAG}: Saving message:`, data);
     await WhatsappMessage.create(data);
   } catch (err: unknown) {
     if (err instanceof Error && (err as { code?: number }).code === 11000) {

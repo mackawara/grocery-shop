@@ -200,7 +200,12 @@ export function tenantScope(schema: Schema): void {
     pipeline.unshift({ $match: { tenantId: toObjectId(tenantId) } });
   });
 
-  schema.pre<TenantDoc>('save', function (this: TenantDoc) {
+  // Inject/guard tenantId on validate, not save: Mongoose runs document
+  // validation (pre('validate') → validate) *before* pre('save'), so a
+  // pre('save') injection lands too late for a `required: true` tenantId — the
+  // doc fails validation before the hook ever runs. Hooking validate sets the
+  // field in time and still fires on every save (validateBeforeSave defaults on).
+  schema.pre<TenantDoc>('validate', function (this: TenantDoc) {
     if (isBypassing()) {
       return;
     }
