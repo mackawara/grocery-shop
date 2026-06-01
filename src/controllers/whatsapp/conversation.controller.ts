@@ -1,6 +1,9 @@
 import { logger } from '../../services/logger';
 import { isMessageProcessed } from '../redis/redis.controller';
 import { WA_MESSAGE_TTL_SECONDS } from '../../constants/whatsapp';
+import { ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow';
+import type { OrderFlowResponse } from '../../constants/orderFlow';
+import { orderFlowHandler } from './orderFlowHandler';
 import whatsappMessager from './outgoingMessages';
 import type {
   Text,
@@ -36,7 +39,26 @@ const listReplyHandler = async (from: string, interactive: InteractiveListReplyN
 const nfmReplyHandler = async (from: string, interactive: InteractiveNfmReplyNotification): Promise<void> => {
   const { nfm_reply } = interactive;
   logger.info('[INTERACTIVE_NFM_REPLY] : from:', from, '| name:', nfm_reply.name, '| response:', nfm_reply.response_json);
-  await whatsappMessager.sendFreeFormTextMessage(from, `Flow response received — form: "${nfm_reply.name}"`);
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(nfm_reply.response_json) as Record<string, unknown>;
+  } catch (error) {
+    logger.error('[INTERACTIVE_NFM_REPLY] : Failed to parse response_json from:', from, error);
+    return;
+  }
+
+  // Route the completed flow by the flow_token Meta echoes back in response_json.
+  const flowToken = typeof payload.flow_token === 'string' ? payload.flow_token : undefined;
+  switch (flowToken) {
+    case ORDER_DETAILS_FLOW_TOKEN:
+      await orderFlowHandler(from, payload as unknown as OrderFlowResponse);
+      break;
+    default:
+      logger.info('[INTERACTIVE_NFM_REPLY] : Unhandled flow_token:', flowToken, 'from:', from);
+      // eslint-disable-next-line max-len
+      await whatsappMessager.sendFreeFormTextMessage(from, `Flow response received — form: "${nfm_reply.name}"`);
+  }
 };
 
 export const interactiveHandler = async (from: string, interactive: InteractivePayLoad): Promise<void> => {
