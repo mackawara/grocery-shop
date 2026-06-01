@@ -16,6 +16,7 @@ import { fromUnixTime } from 'date-fns';
 import whatsappMessager from './outgoingMessages';
 
 export const incomingMessagesHandler = async (req: Request, res: Response) => {
+  // eslint-disable-next-line max-len
   res.status(200).json({ success: true });// early return to avoid repeated processing in case of retries from WhatsApp
 
   const reqBody: WebhookNotificationBody = req.body;
