@@ -21,6 +21,7 @@ import {
   PaymentMethod,
   DeliveryMethod,
 } from '../constants/models';
+import { DEFAULT_ORDER_FLOW_ID } from '../constants/orderFlow';
 import { runWithoutTenant } from '../context/tenantContext';
 
 const TAG = 'SEED_LOCAL_TENANT';
@@ -54,7 +55,11 @@ const run = async (): Promise<void> => {
   const country = required('LOCAL_TENANT_COUNTRY');
   const whatsappBusinessId = required('LOCAL_TENANT_WHATSAPP_BUSINESS_ID');
   const whatsappCatalogId = process.env.LOCAL_TENANT_WHATSAPP_CATALOG_ID?.trim();
-  const orderFlowId = process.env.LOCAL_TENANT_WHATSAPP_ORDER_FLOW_ID?.trim();
+  // Always give the local tenant an order flow id so the order handler can pull
+  // it from the tenant; env overrides the shared default.
+  const orderFlowId =
+    process.env.LOCAL_TENANT_WHATSAPP_ORDER_FLOW_ID?.trim() ||
+    DEFAULT_ORDER_FLOW_ID;
 
   await connectDb();
 
@@ -75,14 +80,8 @@ const run = async (): Promise<void> => {
           existing.whatsappBusinessId = whatsappBusinessId;
           existing.status = TenantStatus.TRIAL;
           existing.plan = TenantPlan.FREE;
-          existing.paymentMethods = [
-            PaymentMethod.CASH_ON_DELIVERY,
-            PaymentMethod.ECOCASH,
-          ];
-          existing.deliveryMethods = [
-            DeliveryMethod.COLLECT,
-            DeliveryMethod.DOOR_DELIVERY,
-          ];
+          existing.paymentMethods = Object.values(PaymentMethod);
+          existing.deliveryMethods = Object.values(DeliveryMethod);
           if (whatsappCatalogId) {
             existing.whatsappCatalogId = whatsappCatalogId;
           }
@@ -109,14 +108,8 @@ const run = async (): Promise<void> => {
           whatsappBusinessId,
           ...(whatsappCatalogId ? { whatsappCatalogId } : {}),
           whatsappFlowIds: orderFlowId ? { order: orderFlowId } : {},
-          paymentMethods: [
-            PaymentMethod.CASH_ON_DELIVERY,
-            PaymentMethod.ECOCASH,
-          ],
-          deliveryMethods: [
-            DeliveryMethod.COLLECT,
-            DeliveryMethod.DOOR_DELIVERY,
-          ],
+          paymentMethods: Object.values(PaymentMethod),
+          deliveryMethods: Object.values(DeliveryMethod),
         });
         logger.info(
           `[${TAG}] Created local tenant slug="${created.slug}" id=${created._id?.toString()}`,

@@ -2,10 +2,17 @@ import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 import { logger } from '../../services/logger';
 import type { Order } from '../../types/types';
-import whatsappMessager from './outgoingMessages';
+import whatsappMessager, { createFlowInteractive } from './outgoingMessages';
 import OrderModel from '../../models/Order';
 import { OrderItem } from '../../models/OrderItem';
 import { setRedisHashKeyValuePair } from '../redis/redis.controller';
+import Tenant from '../../models/Tenant';
+import { getTenantId } from '../../context/tenantContext';
+import {
+  toPaymentMethodOptions,
+  toDeliveryMethodOptions,
+} from '../../constants/models';
+import { DEFAULT_ORDER_FLOW_ID, ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow';
 // import User from "../../models/User"; // TODO: uncomment once User model is fully defined
 
 const ORDER_SESSION_TTL_SECONDS = 1800; // 30 minutes
@@ -79,7 +86,9 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
     await session.commitTransaction();
     logger.info(`[ORDER_MESSAGE] Order ${orderNumber} committed for ${from}`);
 
+    // eslint-disable-next-line max-len
     await setRedisHashKeyValuePair({ hashName: from, key: 'orderNumber', value: orderNumber, expiry: ORDER_SESSION_TTL_SECONDS });
+    // eslint-disable-next-line max-len
     await setRedisHashKeyValuePair({ hashName: from, key: 'items', value: JSON.stringify(itemSummaries), expiry: ORDER_SESSION_TTL_SECONDS });
 
     const itemsList = itemSummaries
@@ -88,12 +97,34 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
 
     await whatsappMessager.sendFreeFormTextMessage(
       from,
+      // eslint-disable-next-line max-len
       `Order received!\n\n${itemsList}\n\nTotal: $${totalAmount.toFixed(2)}\nOrder #: ${orderNumber}\n\nWe'll be in touch shortly to confirm your order.`,
     );
+    // Pull the methods this tenant offers so the flow only presents valid
+    // options. Tenant has no tenantScope plugin, so findById resolves directly
+    // against the current tenant context set by whatsappTenantResolver.
+    const tenant = await Tenant.findById(getTenantId())
+      .select('paymentMethods deliveryMethods whatsappFlowIds')
+      .lean();
+
+    const orderDetailsFlow= createFlowInteractive({
+      bodyText: 'Please fill in the following form to complete your order:',
+      flowId: tenant?.whatsappFlowIds?.order ?? DEFAULT_ORDER_FLOW_ID,
+      flowToken: ORDER_DETAILS_FLOW_TOKEN,
+      initialScreen: 'ORDER_DETAILS',
+      // TODO: generate a unique token per order to correlate flow responses back to orders
+      initialData: {
+        payment_methods: toPaymentMethodOptions(tenant?.paymentMethods ?? []),
+        delivery_methods: toDeliveryMethodOptions(tenant?.deliveryMethods ?? []),
+      },
+      flowCta: 'Complete Order Form',
+    });
+    await whatsappMessager.sendInteractive(from, orderDetailsFlow);
 
   } catch (error) {
     await session.abortTransaction();
     logger.error(`[ORDER_MESSAGE] Error processing order from ${from}:`, error);
+    // eslint-disable-next-line max-len
     await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we ran into an issue processing your order. Please try again.');
   } finally {
     session.endSession();

@@ -81,12 +81,12 @@ const TenantSchema = new Schema<ITenant>(
     paymentMethods: {
       type: [String],
       enum: Object.values(PaymentMethod),
-      default: [],
+      default: () => [PaymentMethod.CASH_ON_DELIVERY],
     },
     deliveryMethods: {
       type: [String],
       enum: Object.values(DeliveryMethod),
-      default: [],
+      default: () => [DeliveryMethod.COLLECT],
     },
   },
   { timestamps: true },

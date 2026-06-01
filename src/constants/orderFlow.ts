@@ -1,19 +1,36 @@
 /**
  * WhatsApp Flow JSON for the order capture flow.
  *
- * Structure (modelled after WhatsApp Flow JSON v7.3):
- *   1. ORDER_DETAILS    — name, payment method (+ conditional ecocash number), delivery method.
- *                         The Continue button posts a `data_exchange` to /whatsapp/flows. The
- *                         server reads `delivery_method` and responds with either:
- *                           - { screen: "DELIVERY_ADDRESS", data: {} }  (when delivery)
- *                           - { screen: "SUCCESS", data: {...} }        (when pickup → close flow)
+ * Single screen (modelled after WhatsApp Flow JSON v7.3):
+ *   ORDER_DETAILS — name, payment method (+ conditional ecocash number),
+ *                   delivery method, and the delivery-address fields. The
+ *                   Footer `complete`s the flow in one step (no navigation).
  *
- *   2. DELIVERY_ADDRESS — street, suburb/location, area, town. Footer completes the flow.
- *
- * Conditional rendering:
- *   - ecocash_number is shown (and required) only when payment_method === 'ecocash'
- *     via the `visible` / `required` expressions evaluated client-side.
+ * Conditional rendering (evaluated client-side via `visible` / `required`):
+ *   - ecocash_number is shown (and required) only when payment_method === 'ecocash'.
+ *   - the delivery-address fields (street/suburb/area/town) are shown (and
+ *     required) only when delivery_method === DeliveryMethod.DOOR_DELIVERY,
+ *     i.e. the option that actually needs an address. Collect/pickup hides them.
  */
+
+import {
+  DeliveryMethod as DeliveryMethodEnum,
+  PaymentMethod as PaymentMethodEnum,
+  toPaymentMethodOptions,
+  toDeliveryMethodOptions,
+} from './models';
+
+// Fallback Meta flow id for the order-details flow. Tenants carry their own id
+// in `whatsappFlowIds.order`; this is only used when that is unset (e.g. local
+// dev before the env var is configured).
+export const DEFAULT_ORDER_FLOW_ID = '1310221120578634';
+
+// flow_token sent with the order-details flow and echoed back by Meta inside
+// `nfm_reply.response_json` on completion. The nfm-reply handler switches on
+// this value to route the captured payload to `orderFlowHandler`.
+// TODO: replace with a per-order token so flow responses correlate to a
+// specific order instead of being looked up by sender.
+export const ORDER_DETAILS_FLOW_TOKEN = 'orders_flow_token';
 
 export const ORDER_FLOW_SCREENS = {
   ORDER_DETAILS: 'ORDER_DETAILS',
@@ -69,17 +86,35 @@ export interface DeliveryAddressPayload {
   town: string;
 }
 
+/**
+ * The full payload echoed back through `nfm_reply.response_json` when the flow
+ * completes. It is the union of the `complete` action payload plus the
+ * `flow_token` Meta injects. Address fields are optional because they are only
+ * collected for the door-delivery option. Method values arrive as the
+ * `PaymentMethod` / `DeliveryMethod` enum strings from `constants/models`.
+ */
+export interface OrderFlowResponse
+  extends OrderDetailsPayload,
+    Partial<DeliveryAddressPayload> {
+  flow_token?: string;
+}
+
+// Conditional expressions must be wrapped in backticks for WhatsApp Flows.
+// Address fields render only for the delivery option that needs an address.
+const NEEDS_ADDRESS = `\`\${form.delivery_method == '${DeliveryMethodEnum.DOOR_DELIVERY}'}\``;
+const NEEDS_ECOCASH = "`${form.payment_method == 'ecocash'}`";
+
 export const ORDER_FLOW_JSON = {
   version: '7.3',
   data_api_version: '3.0',
   routing_model: {
-    [ORDER_FLOW_SCREENS.ORDER_DETAILS]: [ORDER_FLOW_SCREENS.DELIVERY_ADDRESS],
-    [ORDER_FLOW_SCREENS.DELIVERY_ADDRESS]: [],
+    [ORDER_FLOW_SCREENS.ORDER_DETAILS]: [],
   },
   screens: [
     {
       id: ORDER_FLOW_SCREENS.ORDER_DETAILS,
       title: 'Order Details',
+      terminal: true,
       data: {
         payment_methods: {
           type: 'array',
@@ -90,7 +125,7 @@ export const ORDER_FLOW_JSON = {
               title: { type: 'string' },
             },
           },
-          __example__: PAYMENT_METHOD_OPTIONS,
+          __example__: toPaymentMethodOptions(Object.values(PaymentMethodEnum)),
         },
         delivery_methods: {
           type: 'array',
@@ -101,7 +136,9 @@ export const ORDER_FLOW_JSON = {
               title: { type: 'string' },
             },
           },
-          __example__: DELIVERY_METHOD_OPTIONS,
+          __example__: toDeliveryMethodOptions(
+            Object.values(DeliveryMethodEnum),
+          ),
         },
       },
       layout: {
@@ -134,8 +171,8 @@ export const ORDER_FLOW_JSON = {
                 type: 'TextInput',
                 name: 'ecocash_number',
                 label: 'EcoCash number',
-                required: "${form.payment_method == 'ecocash'}",
-                visible: "${form.payment_method == 'ecocash'}",
+                required: NEEDS_ECOCASH,
+                visible: NEEDS_ECOCASH,
                 'input-type': 'phone',
                 'helper-text': 'Number that will receive the payment prompt',
               },
@@ -147,57 +184,16 @@ export const ORDER_FLOW_JSON = {
                 'data-source': '${data.delivery_methods}',
               },
               {
-                type: 'Footer',
-                label: 'Continue',
-                'on-click-action': {
-                  name: 'data_exchange',
-                  payload: {
-                    full_name: '${form.full_name}',
-                    payment_method: '${form.payment_method}',
-                    ecocash_number: '${form.ecocash_number}',
-                    delivery_method: '${form.delivery_method}',
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-    {
-      id: ORDER_FLOW_SCREENS.DELIVERY_ADDRESS,
-      title: 'Delivery Address',
-      data: {
-        full_name: {
-          type: 'string',
-          __example__: 'Jane Doe',
-        },
-        payment_method: {
-          type: 'string',
-          __example__: PAYMENT_METHODS.ECOCASH,
-        },
-        ecocash_number: {
-          type: 'string',
-          __example__: '+263771234567',
-        },
-      },
-      terminal: true,
-      layout: {
-        type: 'SingleColumnLayout',
-        children: [
-          {
-            type: 'Form',
-            name: 'address_form',
-            children: [
-              {
                 type: 'TextSubheading',
                 text: 'Where should we deliver?',
+                visible: NEEDS_ADDRESS,
               },
               {
                 type: 'TextInput',
                 name: 'street',
                 label: 'Street',
-                required: true,
+                required: NEEDS_ADDRESS,
+                visible: NEEDS_ADDRESS,
                 'input-type': 'text',
                 'helper-text': 'House number and street',
               },
@@ -205,21 +201,24 @@ export const ORDER_FLOW_JSON = {
                 type: 'TextInput',
                 name: 'suburb',
                 label: 'Suburb / Location',
-                required: true,
+                required: NEEDS_ADDRESS,
+                visible: NEEDS_ADDRESS,
                 'input-type': 'text',
               },
               {
                 type: 'TextInput',
                 name: 'area',
                 label: 'Area',
-                required: true,
+                required: NEEDS_ADDRESS,
+                visible: NEEDS_ADDRESS,
                 'input-type': 'text',
               },
               {
                 type: 'TextInput',
                 name: 'town',
                 label: 'Town / City',
-                required: true,
+                required: NEEDS_ADDRESS,
+                visible: NEEDS_ADDRESS,
                 'input-type': 'text',
               },
               {
@@ -228,9 +227,10 @@ export const ORDER_FLOW_JSON = {
                 'on-click-action': {
                   name: 'complete',
                   payload: {
-                    full_name: '${data.full_name}',
-                    payment_method: '${data.payment_method}',
-                    ecocash_number: '${data.ecocash_number}',
+                    full_name: '${form.full_name}',
+                    payment_method: '${form.payment_method}',
+                    ecocash_number: '${form.ecocash_number}',
+                    delivery_method: '${form.delivery_method}',
                     street: '${form.street}',
                     suburb: '${form.suburb}',
                     area: '${form.area}',

@@ -58,3 +58,37 @@ export enum DeliveryMethod {
   COLLECT = 'collect',
   DOOR_DELIVERY = 'door_delivery',
 }
+
+// Customer-facing labels for each method. Used to build the { id, title }
+// options a WhatsApp Flow RadioButtonsGroup data-source requires.
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  [PaymentMethod.ECOCASH]: 'EcoCash',
+  [PaymentMethod.OMARI]: "O'mari",
+  [PaymentMethod.CASH_ON_DELIVERY]: 'Cash on delivery / pickup',
+};
+
+export const DELIVERY_METHOD_LABELS: Record<DeliveryMethod, string> = {
+  [DeliveryMethod.COLLECT]: 'Collect / Pickup',
+  [DeliveryMethod.DOOR_DELIVERY]: 'Door delivery',
+};
+
+export interface MethodOption {
+  id: string;
+  title: string;
+}
+
+export const toPaymentMethodOptions = (
+  methods: PaymentMethod[],
+): MethodOption[] =>
+  methods.map((method) => ({
+    id: method,
+    title: PAYMENT_METHOD_LABELS[method] ?? method,
+  }));
+
+export const toDeliveryMethodOptions = (
+  methods: DeliveryMethod[],
+): MethodOption[] =>
+  methods.map((method) => ({
+    id: method,
+    title: DELIVERY_METHOD_LABELS[method] ?? method,
+  }));

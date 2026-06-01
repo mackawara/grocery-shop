@@ -10,6 +10,7 @@ export interface IOrder extends Document {
   tenantId: Types.ObjectId;
   orderNumber: string;
   user: Types.ObjectId;
+  customerName?: string;
   totalAmount: number;
   status: OrderStatus;
   orderDate: Date;
@@ -19,11 +20,18 @@ export interface IOrder extends Document {
     status: PaymentStatus;
     method?: string;
     reference?: string;
+    mobileNumber?: string;
   };
   deliveryDetails?: {
-    address: string;
+    method?: string;
+    address?: {
+      street?: string;
+      suburb?: string;
+      area?: string;
+      town?: string;
+    };
     status: DeliveryStatus;
-    expectedDeliveryDate: Date;
+    expectedDeliveryDate?: Date;
   };
 }
 
@@ -32,6 +40,7 @@ const OrderSchema = new Schema<IOrder>(
     tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     orderNumber: { type: String, required: true },
     user: { type: Schema.Types.ObjectId, ref: 'User' },
+    customerName: { type: String },
     totalAmount: { type: Number, required: true, default: 0 },
     status: {
       type: String,
@@ -45,6 +54,22 @@ const OrderSchema = new Schema<IOrder>(
       status: { type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING },
       method: { type: String },
       reference: { type: String },
+      mobileNumber: { type: String },
+    },
+    deliveryDetails: {
+      method: { type: String },
+      address: {
+        street: { type: String },
+        suburb: { type: String },
+        area: { type: String },
+        town: { type: String },
+      },
+      status: {
+        type: String,
+        enum: Object.values(DeliveryStatus),
+        default: DeliveryStatus.PENDING,
+      },
+      expectedDeliveryDate: { type: Date },
     },
   },
   { timestamps: true },
