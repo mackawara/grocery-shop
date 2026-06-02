@@ -10,6 +10,12 @@ import {
 } from '../../constants/models';
 import { sanitizeText, sanitizePhone } from '../../utils/sanitize';
 import type { OrderFlowResponse } from '../../constants/orderFlow';
+import { promptForLocation } from '../delivery/deliveryFlowHandler';
+import {
+  resolveUserByPhone,
+  resolveDeliveryAddress,
+} from '../delivery/deliveryAddress.controller';
+import type { Types } from 'mongoose';
 
 const isPaymentMethod = (value: unknown): value is PaymentMethod =>
   typeof value === 'string' &&
@@ -46,8 +52,10 @@ export const orderFlowHandler = async (
       ? sanitizePhone(payload.ecocash_number)
       : undefined;
 
-  // Address is only collected (and only meaningful) for door delivery.
-  const address =
+  // Address fields are only collected (and only meaningful) for door
+  // delivery. They feed straight into the DeliveryAddress document below;
+  // Order itself only holds the foreign key.
+  const typedAddress =
     deliveryMethod === DeliveryMethod.DOOR_DELIVERY
       ? {
           street: sanitizeText(payload.street),
@@ -90,12 +98,35 @@ export const orderFlowHandler = async (
       order.deliveryDetails = {
         method: deliveryMethod,
         status: order.deliveryDetails?.status ?? DeliveryStatus.PENDING,
-        ...(address ? { address } : {}),
+        address: order.deliveryDetails?.address,
       };
+    }
+
+    if (deliveryMethod === DeliveryMethod.DOOR_DELIVERY && typedAddress) {
+      const user = await resolveUserByPhone(from);
+      const userId = user._id as Types.ObjectId;
+      const addressId = await resolveDeliveryAddress({
+        userId,
+        existingAddressId: order.deliveryDetails?.address as Types.ObjectId | undefined,
+        typed: typedAddress,
+      });
+      order.user = userId;
+      order.deliveryDetails = {
+        ...order.deliveryDetails,
+        address: addressId,
+      } as typeof order.deliveryDetails;
     }
 
     await order.save();
     logger.info(`[ORDER_FLOW] Order ${orderNumber} updated with flow details for ${from}`);
+
+    // For door delivery we still need the GPS pin — Zim addresses aren't
+    // reliably geocodable, so the typed address alone won't get the driver
+    // to the door.
+    if (deliveryMethod === DeliveryMethod.DOOR_DELIVERY) {
+      await promptForLocation(from);
+      return;
+    }
 
     await whatsappMessager.sendFreeFormTextMessage(
       from,

@@ -16,6 +16,19 @@ export interface IWhatsappFlowIds {
   support?: string;
 }
 
+export interface ITenantAddress {
+  streetNumber?: string;
+  streetName?: string;
+  area?: string;
+  subArea?: string;
+  city?: string;
+}
+
+export interface IGpsCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface ITenant extends Document {
   status: TenantStatus;
   plan: TenantPlan;
@@ -29,6 +42,8 @@ export interface ITenant extends Document {
   whatsappFlowIds: IWhatsappFlowIds;
   paymentMethods: PaymentMethod[];
   deliveryMethods: DeliveryMethod[];
+  address?: ITenantAddress;
+  location_gps?: IGpsCoordinates;
 }
 
 const WhatsappFlowIdsSchema = new Schema<IWhatsappFlowIds>(
@@ -87,6 +102,17 @@ const TenantSchema = new Schema<ITenant>(
       type: [String],
       enum: Object.values(DeliveryMethod),
       default: () => [DeliveryMethod.COLLECT],
+    },
+    address: {
+      streetNumber: { type: String, trim: true },
+      streetName: { type: String, trim: true },
+      area: { type: String, trim: true },
+      subArea: { type: String, trim: true },
+      city: { type: String, trim: true },
+    },
+    location_gps: {
+      latitude: { type: Number },
+      longitude: { type: Number },
     },
   },
   { timestamps: true },

@@ -305,9 +305,73 @@ export async function sendWhatsAppCatalogMessage({
   }
 }
 
+const sendLocationRequestMessage = async (
+  receivingNumber: string,
+  bodyText: string,
+): Promise<MessageResult> => {
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: messagesEndpointUrl,
+      headers,
+      data: {
+        messaging_product: constants.whatsapp.WHATSAPP,
+        recipient_type: constants.whatsapp.INDIVIDUAL,
+        to: receivingNumber,
+        type: constants.whatsapp.INTERACTIVE,
+        interactive: {
+          type: 'location_request_message',
+          body: { text: bodyText.substring(0, 1024) },
+          action: { name: 'send_location' },
+        },
+      },
+    });
+
+    if (!response || response.status !== 200) {
+      return {
+        success: false,
+        error: `Failed to send location request. Status code: ${response?.status}`,
+      };
+    }
+
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: 'outbound',
+      messageType: 'interactive',
+      interactiveType: 'location_request_message',
+      content: bodyText,
+      externalId: response.data?.messages?.[0]?.id,
+      timestamp: new Date(),
+      status: 'sent',
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    if (UTILS.isFacebookAPIError(err)) {
+      const { message, fbtrace_id, error_data } = err.response.data.error;
+      logger.error(
+        `${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`,
+      );
+    }
+
+    await saveWhatsappMessage({
+      phoneNumber: receivingNumber,
+      direction: 'outbound',
+      messageType: 'interactive',
+      interactiveType: 'location_request_message',
+      content: bodyText,
+      timestamp: new Date(),
+      status: 'failed',
+    });
+
+    return { success: false, error: err.message };
+  }
+};
+
 const whatsappMessager = {
   sendFreeFormTextMessage,
   sendInteractive,
+  sendLocationRequestMessage,
   createFlowInteractive,
   sendWhatsAppCatalogMessage,
 };

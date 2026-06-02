@@ -24,12 +24,10 @@ export interface IOrder extends Document {
   };
   deliveryDetails?: {
     method?: string;
-    address?: {
-      street?: string;
-      suburb?: string;
-      area?: string;
-      town?: string;
-    };
+    // Foreign key to DeliveryAddress — the delivery controller owns the
+    // canonical address document (typed fields + GPS). Order only points
+    // at it; it does not snapshot any address fields.
+    address?: Types.ObjectId;
     status: DeliveryStatus;
     expectedDeliveryDate?: Date;
   };
@@ -58,12 +56,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     deliveryDetails: {
       method: { type: String },
-      address: {
-        street: { type: String },
-        suburb: { type: String },
-        area: { type: String },
-        town: { type: String },
-      },
+      address: { type: Schema.Types.ObjectId, ref: 'DeliveryAddress' },
       status: {
         type: String,
         enum: Object.values(DeliveryStatus),
