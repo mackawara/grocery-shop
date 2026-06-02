@@ -12,7 +12,8 @@ export type WaInteractiveType =
   | 'list'
   | 'product_list'
   | 'catalog_message'
-  | 'cta_url';
+  | 'cta_url'
+  | 'location_request_message';
 export type WaMessageStatus = 'received' | 'sent' | 'failed';
 
 export interface IWhatsappMessage extends Document {
@@ -34,7 +35,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
     direction: { type: String, enum: ['inbound', 'outbound'], required: true },
     messageType: {
       type: String,
-      enum: ['text', 'interactive', 'order', 'reaction'],
+      enum: ['text', 'interactive', 'order', 'reaction', 'location'],
       required: true,
     },
     interactiveType: {
@@ -49,6 +50,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
         'product_list',
         'catalog_message',
         'cta_url',
+        'location_request_message',
       ],
       default: null,
     },

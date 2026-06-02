@@ -5,14 +5,16 @@ import { tenantScope } from './plugins/tenantScope';
 export interface IDeliveryAddress extends Document {
   tenantId: mongoose.Types.ObjectId;
   user: mongoose.Types.ObjectId;
-  streetNumber: string;
-  streetName: string;
-  area: string;
+  streetNumber?: string;
+  streetName?: string;
+  area?: string;
   subArea?: string;
   city: string;
   location_gps?: {
     latitude: number;
     longitude: number;
+    name?: string;
+    address?: string;
   };
 }
 
@@ -31,17 +33,14 @@ const DeliveryAddressSchema = new Schema<IDeliveryAddress>(
     },
     streetNumber: {
       type: String,
-      required: true,
       trim: true,
     },
     streetName: {
       type: String,
-      required: true,
       trim: true,
     },
     area: {
       type: String,
-      required: true,
       trim: true,
     },
     subArea: {
@@ -57,6 +56,8 @@ const DeliveryAddressSchema = new Schema<IDeliveryAddress>(
     location_gps: {
       latitude: { type: Number },
       longitude: { type: Number },
+      name: { type: String, trim: true },
+      address: { type: String, trim: true },
     },
   },
   { timestamps: true },

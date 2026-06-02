@@ -6,9 +6,10 @@ import type {
   InteractiveMessageNotification,
   OrderMessageNotification,
   ReactionMessageNotification,
+  LocationMessageNotification,
 } from '../../types/types';
 // eslint-disable-next-line max-len
-import { textHandler, interactiveHandler, reactionHandler, isWhatsAppMessageProcessed } from './conversation.controller';
+import { textHandler, interactiveHandler, reactionHandler, locationHandler, isWhatsAppMessageProcessed } from './conversation.controller';
 import { whatsappOrderHandler } from './whatsappOrderHandler';
 import { saveWhatsappMessage } from '../../utils/whatsapp.utils';
 import type { WaInteractiveType, WaMessageType } from '../../models/whatsappMessage.model';
@@ -40,7 +41,6 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
           case 'text': {
             const { text } = messages[0] as Text;
             content = text.body;
-            await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
             await textHandler(from, text);
             break;
           }
@@ -61,6 +61,12 @@ export const incomingMessagesHandler = async (req: Request, res: Response) => {
             const { reaction } = messages[0] as ReactionMessageNotification;
             content = reaction.emoji;
             await reactionHandler(from, reaction);
+            break;
+          }
+          case 'location': {
+            const { location } = messages[0] as LocationMessageNotification;
+            content = `${location.latitude},${location.longitude}`;
+            await locationHandler(from, location);
             break;
           }
           default:

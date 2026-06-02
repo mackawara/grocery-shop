@@ -45,10 +45,22 @@ export interface ReactionMessageNotification
   };
 }
 
+export interface LocationMessageNotification
+  extends BaseMessageNotificationPayload {
+  type: 'location';
+  location: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  };
+}
+
 export type MessageNotification =
   | InteractiveMessageNotification
   | OrderMessageNotification
   | ReactionMessageNotification
+  | LocationMessageNotification
   | Text;
 export interface InteractiveListReplyNotifications {
   list_reply: {
