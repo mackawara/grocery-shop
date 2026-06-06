@@ -244,7 +244,7 @@ export async function sendWhatsAppCatalogMessage({
       type: 'catalog_message',
       body: { text: bodyText.substring(0, 1024) },
       action: { name: 'catalog_message' },
-      footer: { text: footer ? footer.substring(0, 60) : 'Powered by Beauty Naomi' },
+      footer: { text: footer ? footer.substring(0, 60) : 'Powered by Venta' },
     };
 
     if (thumbnailProductRetailerId) {

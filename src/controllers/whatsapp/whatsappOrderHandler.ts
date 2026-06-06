@@ -23,6 +23,29 @@ interface OrderItemSummary {
   price: number;
 }
 
+// Build + send the order-details flow. Reused to re-prompt when a required field
+// (e.g. the EcoCash number) is missing; the Redis session orderNumber still ties
+// the re-submission back to the same order.
+export const sendOrderDetailsFlow = async (from: string): Promise<void> => {
+  const tenant = await Tenant.findById(getTenantId())
+    .select('paymentMethods deliveryMethods whatsappFlowIds')
+    .lean();
+
+  const orderDetailsFlow = createFlowInteractive({
+    bodyText: 'Please fill in the following form to complete your order:',
+    flowId: tenant?.whatsappFlowIds?.order ?? DEFAULT_ORDER_FLOW_ID,
+    flowToken: ORDER_DETAILS_FLOW_TOKEN,
+    initialScreen: 'ORDER_DETAILS',
+    // TODO: generate a unique token per order to correlate flow responses back to orders
+    initialData: {
+      payment_methods: toPaymentMethodOptions(tenant?.paymentMethods ?? []),
+      delivery_methods: toDeliveryMethodOptions(tenant?.deliveryMethods ?? []),
+    },
+    flowCta: 'Complete Order Form',
+  });
+  await whatsappMessager.sendInteractive(from, orderDetailsFlow);
+};
+
 export const whatsappOrderHandler = async (from: string, order: Order): Promise<void> => {
   // eslint-disable-next-line max-len
   logger.info(`[ORDER_MESSAGE] Processing catalog order from: ${from} | catalog: ${order.catalog_id} | items: ${order.product_items.length}`);
@@ -100,26 +123,7 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
       // eslint-disable-next-line max-len
       `Order received!\n\n${itemsList}\n\nTotal: $${totalAmount.toFixed(2)}\nOrder #: ${orderNumber}\n\nWe'll be in touch shortly to confirm your order.`,
     );
-    // Pull the methods this tenant offers so the flow only presents valid
-    // options. Tenant has no tenantScope plugin, so findById resolves directly
-    // against the current tenant context set by whatsappTenantResolver.
-    const tenant = await Tenant.findById(getTenantId())
-      .select('paymentMethods deliveryMethods whatsappFlowIds')
-      .lean();
-
-    const orderDetailsFlow= createFlowInteractive({
-      bodyText: 'Please fill in the following form to complete your order:',
-      flowId: tenant?.whatsappFlowIds?.order ?? DEFAULT_ORDER_FLOW_ID,
-      flowToken: ORDER_DETAILS_FLOW_TOKEN,
-      initialScreen: 'ORDER_DETAILS',
-      // TODO: generate a unique token per order to correlate flow responses back to orders
-      initialData: {
-        payment_methods: toPaymentMethodOptions(tenant?.paymentMethods ?? []),
-        delivery_methods: toDeliveryMethodOptions(tenant?.deliveryMethods ?? []),
-      },
-      flowCta: 'Complete Order Form',
-    });
-    await whatsappMessager.sendInteractive(from, orderDetailsFlow);
+    await sendOrderDetailsFlow(from);
 
   } catch (error) {
     await session.abortTransaction();

@@ -38,3 +38,12 @@ export const sanitizePhone = (value: unknown): string | undefined => {
   if (digits.length === 0) {return undefined;}
   return hasPlus ? `+${digits}` : digits;
 };
+
+/** Normalise a Zimbabwean mobile number to local 07XXXXXXXX form (+263/263/07). */
+export const normaliseZimMobile = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('263') && digits.length === 12) {
+    return `0${digits.slice(3)}`;
+  }
+  return value.startsWith('0') ? value : `0${digits.slice(-9)}`;
+};

@@ -48,11 +48,34 @@ export enum UserStatus {
   BLACKLISTED = 'blacklisted',
 }
 
+// What the customer picks at checkout — not how it's settled (see PaymentProvider).
 export enum PaymentMethod {
   ECOCASH = 'ecocash',
   OMARI = 'omari',
   CASH_ON_DELIVERY = 'cash_on_delivery',
 }
+
+// The gateway that settles a payment. Distinct from PaymentMethod: an EcoCash
+// payment can settle via Paynow *or* EcoCash's own API (per Tenant.paymentRouting).
+export enum PaymentProvider {
+  PAYNOW = 'paynow',
+  ECOCASH = 'ecocash', // direct merchant API (standalone)
+  OMARI = 'omari', // direct merchant API (standalone)
+  CASH_ON_DELIVERY = 'cash_on_delivery',
+}
+
+// Default routing when a tenant hasn't overridden it.
+export const DEFAULT_PAYMENT_ROUTING: Record<PaymentMethod, PaymentProvider> = {
+  [PaymentMethod.ECOCASH]: PaymentProvider.PAYNOW,
+  [PaymentMethod.OMARI]: PaymentProvider.PAYNOW,
+  [PaymentMethod.CASH_ON_DELIVERY]: PaymentProvider.CASH_ON_DELIVERY,
+};
+
+export const resolvePaymentProvider = (
+  method: PaymentMethod,
+  routing?: Partial<Record<PaymentMethod, PaymentProvider>>,
+): PaymentProvider =>
+  routing?.[method] ?? DEFAULT_PAYMENT_ROUTING[method];
 
 export enum DeliveryMethod {
   COLLECT = 'collect',

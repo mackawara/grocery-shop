@@ -1,9 +1,11 @@
-import express, { Request, Response } from "express";
-import { logger } from "./services/logger";
-import { CONFIG } from "./config";
-import whatsappRoutes from "./routes/whatsapp.routes";
-import cors from "cors";
-import helmet from "helmet";
+import type { Request, Response } from 'express';
+import express from 'express';
+import { logger } from './services/logger';
+import { CONFIG } from './config';
+import whatsappRoutes from './routes/whatsapp.routes';
+import paymentRoutes from './routes/payment.routes';
+import cors from 'cors';
+import helmet from 'helmet';
 
 const app = express();
 app.use(cors());
@@ -11,12 +13,13 @@ app.use(express.json());
 app.use(helmet());
 
 //routes
-app.use("/whatsapp", whatsappRoutes);
+app.use('/whatsapp', whatsappRoutes);
+app.use('/payments', paymentRoutes);
 
 
-app.get("/", (req: Request, res: Response) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({
-    message: "Server running and working",
+    message: 'Server running and working',
   });
 });
 

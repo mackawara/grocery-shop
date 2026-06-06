@@ -20,7 +20,9 @@ const mandatoryEnvironmentConstants = [
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_SYSTEM_TOKEN',
   'WHATSAPP_FLOW_PRIVATE_KEY',
-  ...(isLocal ? ['NGROK_DOMAIN'] : []),
+  // Locally PUBLIC_BASE_URL is derived from the ngrok tunnel; in production it
+  // must be set explicitly so gateway callbacks (Paynow resultUrl) resolve.
+  ...(isLocal ? ['NGROK_DOMAIN'] : ['PUBLIC_BASE_URL']),
 ];
 
 const missingEnvironmentVariables = mandatoryEnvironmentConstants.filter(
@@ -66,6 +68,13 @@ export const CONFIG = {
   WHATSAPP_FLOW_PRIVATE_KEY: process.env.WHATSAPP_FLOW_PRIVATE_KEY || '',
   WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: process.env.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE || '',
   NGROK_DOMAIN: process.env.NGROK_DOMAIN || '',
+  // Publicly reachable base URL gateways use for callbacks (Paynow resultUrl).
+  // Explicit PUBLIC_BASE_URL wins; locally we fall back to the ngrok tunnel.
+  PUBLIC_BASE_URL:
+    process.env.PUBLIC_BASE_URL ||
+    (isLocal && process.env.NGROK_DOMAIN
+      ? `https://${process.env.NGROK_DOMAIN}`
+      : ''),
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? 'LOCAL' : 'PRODUCTION'} environment`,

@@ -5,6 +5,8 @@ import { ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow';
 import type { OrderFlowResponse } from '../../constants/orderFlow';
 import { orderFlowHandler } from './orderFlowHandler';
 import { handleDeliveryLocation } from '../delivery/deliveryFlowHandler';
+import { initiateOrderPayment } from '../payments/payment.controller';
+import { parsePaymentRetryButtonId } from '../../constants/payments';
 import whatsappMessager from './outgoingMessages';
 import type {
   Text,
@@ -29,6 +31,14 @@ export const textHandler = async (from: string, text: Text['text']): Promise<voi
 const buttonReplyHandler = async (from: string, interactive: InteractiveButtonReplyNotification): Promise<void> => {
   const { button_reply } = interactive;
   logger.info('[INTERACTIVE_BUTTON_REPLY] : from:', from, '| id:', button_reply.id, '| title:', button_reply.title);
+
+  // "Try again" on a failed payment — re-charge the order in the button id.
+  const retryOrderNumber = parsePaymentRetryButtonId(button_reply.id);
+  if (retryOrderNumber) {
+    await initiateOrderPayment(from, retryOrderNumber);
+    return;
+  }
+
   await whatsappMessager.sendFreeFormTextMessage(from, `Button reply received — id: ${button_reply.id}, title: "${button_reply.title}"`);
 };
 
