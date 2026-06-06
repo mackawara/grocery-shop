@@ -26,6 +26,7 @@
     "lodash": "^4.18.1",
     "mongoose": "^9.6.2",
     "morgan": "^1.10.1",
+    "paynow": "^2.2.2",
     "redis": "^5.12.1",
     "typescript": "^6.0.3",
     "winston": "^3.19.0"
@@ -39,6 +40,7 @@
     "eslint": "^10.3.0",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
+    "jiti": "^2.7.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.59.2"

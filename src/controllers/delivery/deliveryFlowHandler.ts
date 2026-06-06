@@ -9,6 +9,7 @@ import {
   setRedisHashKeyValuePair,
 } from '../redis/redis.controller';
 import { haversineKm } from '../../utils/geo';
+import { initiateOrderPayment } from '../payments/payment.controller';
 
 const TAG = '[DELIVERY_FLOW]';
 
@@ -117,8 +118,11 @@ export const handleDeliveryLocation = async (
     await whatsappMessager.sendFreeFormTextMessage(
       from,
       // eslint-disable-next-line max-len
-      `Got it! Order ${orderNumber} is confirmed and we'll be in touch shortly.\n\nWrong location? Just send a new pin to update it.`,
+      `Got it! We've saved your delivery location for order ${orderNumber}.\n\nWrong location? Just send a new pin to update it.`,
     );
+
+    // Address is fully sorted (typed fields + GPS) — now collect payment.
+    await initiateOrderPayment(from, orderNumber);
   } catch (error) {
     logger.error(`${TAG} Error handling delivery location from ${from}: ${error}`);
 

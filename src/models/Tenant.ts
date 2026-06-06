@@ -4,10 +4,10 @@ import {
   TenantStatus,
   TenantPlan,
   PaymentMethod,
+  PaymentProvider,
   DeliveryMethod,
 } from '../constants/models';
 
-export { TenantStatus, TenantPlan, PaymentMethod, DeliveryMethod };
 
 export interface IWhatsappFlowIds {
   order?: string;
@@ -29,6 +29,31 @@ export interface IGpsCoordinates {
   longitude: number;
 }
 
+// Per-merchant Paynow credentials from the Paynow dashboard. integrationKey is
+// the hash secret used to sign/verify requests.
+export interface IPaynowCredentials {
+  integrationId: string;
+  integrationKey: string;
+  authEmail: string;
+}
+
+// Standalone EcoCash/OMari direct-API credentials, used only when a tenant
+// routes a method straight to the network instead of through Paynow.
+export interface IMobileMoneyCredentials {
+  merchantCode: string;
+  apiKey: string;
+  apiSecret: string;
+  baseUrl?: string;
+}
+
+// select:false (see schema) — query explicitly inside the payment layer so
+// secrets never ride along on incidental tenant reads.
+export interface IPaymentCredentials {
+  paynow?: IPaynowCredentials;
+  ecocash?: IMobileMoneyCredentials;
+  omari?: IMobileMoneyCredentials;
+}
+
 export interface ITenant extends Document {
   status: TenantStatus;
   plan: TenantPlan;
@@ -42,6 +67,9 @@ export interface ITenant extends Document {
   whatsappFlowIds: IWhatsappFlowIds;
   paymentMethods: PaymentMethod[];
   deliveryMethods: DeliveryMethod[];
+  paymentCredentials?: IPaymentCredentials;
+  // Method→gateway overrides; absent entries fall back to DEFAULT_PAYMENT_ROUTING.
+  paymentRouting?: Partial<Record<PaymentMethod, PaymentProvider>>;
   address?: ITenantAddress;
   location_gps?: IGpsCoordinates;
 }
@@ -53,6 +81,46 @@ const WhatsappFlowIdsSchema = new Schema<IWhatsappFlowIds>(
     returns: { type: String },
     support: { type: String },
   },
+  { _id: false },
+);
+
+const PaynowCredentialsSchema = new Schema<IPaynowCredentials>(
+  {
+    integrationId: { type: String, required: true, trim: true },
+    integrationKey: { type: String, required: true, trim: true },
+    authEmail: { type: String, required: true, trim: true, lowercase: true },
+  },
+  { _id: false },
+);
+
+const MobileMoneyCredentialsSchema = new Schema<IMobileMoneyCredentials>(
+  {
+    merchantCode: { type: String, required: true, trim: true },
+    apiKey: { type: String, required: true, trim: true },
+    apiSecret: { type: String, required: true, trim: true },
+    baseUrl: { type: String, trim: true },
+  },
+  { _id: false },
+);
+
+const PaymentCredentialsSchema = new Schema<IPaymentCredentials>(
+  {
+    paynow: { type: PaynowCredentialsSchema },
+    ecocash: { type: MobileMoneyCredentialsSchema },
+    omari: { type: MobileMoneyCredentialsSchema },
+  },
+  { _id: false },
+);
+
+// Keys are derived from PaymentMethod so the schema stays in sync with the enum:
+// add a method there and it's automatically routable here, no schema edit needed.
+const PaymentRoutingSchema = new Schema<Partial<Record<PaymentMethod, PaymentProvider>>>(
+  Object.fromEntries(
+    Object.values(PaymentMethod).map((method) => [
+      method,
+      { type: String, enum: Object.values(PaymentProvider) },
+    ]),
+  ),
   { _id: false },
 );
 
@@ -103,6 +171,11 @@ const TenantSchema = new Schema<ITenant>(
       enum: Object.values(DeliveryMethod),
       default: () => [DeliveryMethod.COLLECT],
     },
+    // select:false so secrets never leak through routine tenant reads.
+    paymentCredentials: { type: PaymentCredentialsSchema, select: false },
+    // Method→gateway overrides; keys mirror the PaymentMethod enum (see
+    // PaymentRoutingSchema). Absent entries fall back to DEFAULT_PAYMENT_ROUTING.
+    paymentRouting: { type: PaymentRoutingSchema },
     address: {
       streetNumber: { type: String, trim: true },
       streetName: { type: String, trim: true },

@@ -11,6 +11,8 @@ import {
 import { sanitizeText, sanitizePhone } from '../../utils/sanitize';
 import type { OrderFlowResponse } from '../../constants/orderFlow';
 import { promptForLocation } from '../delivery/deliveryFlowHandler';
+import { initiateOrderPayment } from '../payments/payment.controller';
+import { sendOrderDetailsFlow } from './whatsappOrderHandler';
 import {
   resolveUserByPhone,
   resolveDeliveryAddress,
@@ -51,6 +53,15 @@ export const orderFlowHandler = async (
     paymentMethod === PaymentMethod.ECOCASH
       ? sanitizePhone(payload.ecocash_number)
       : undefined;
+
+  // EcoCash settles to a specific wallet, so the number is mandatory. The flow
+  // marks it required client-side, but enforce it here too — re-send the form
+  // rather than charge the wrong number if it's missing.
+  if (paymentMethod === PaymentMethod.ECOCASH && !ecocashNumber) {
+    logger.warn(`[ORDER_FLOW] EcoCash selected without a number from ${from}, re-sending form`);
+    await sendOrderDetailsFlow(from);
+    return;
+  }
 
   // Address fields are only collected (and only meaningful) for door
   // delivery. They feed straight into the DeliveryAddress document below;
@@ -122,17 +133,20 @@ export const orderFlowHandler = async (
 
     // For door delivery we still need the GPS pin — Zim addresses aren't
     // reliably geocodable, so the typed address alone won't get the driver
-    // to the door.
+    // to the door. Payment is kicked off later, once the pin lands (see
+    // handleDeliveryLocation).
     if (deliveryMethod === DeliveryMethod.DOOR_DELIVERY) {
       await promptForLocation(from);
       return;
     }
 
+    // Collect/pickup: nothing more to gather, so charge straight away.
     await whatsappMessager.sendFreeFormTextMessage(
       from,
       // eslint-disable-next-line max-len
-      `Thanks${customerName ? `, ${customerName}` : ''}! We've captured your details for order ${orderNumber} and will confirm shortly.`,
+      `Thanks${customerName ? `, ${customerName}` : ''}! We've captured your details for order ${orderNumber}.`,
     );
+    await initiateOrderPayment(from, orderNumber);
   } catch (error) {
     logger.error(`[ORDER_FLOW] Error saving flow details for ${from}:`, error);
     await whatsappMessager.sendFreeFormTextMessage(

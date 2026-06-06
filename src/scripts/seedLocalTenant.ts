@@ -61,6 +61,21 @@ const run = async (): Promise<void> => {
     process.env.LOCAL_TENANT_WHATSAPP_ORDER_FLOW_ID?.trim() ||
     DEFAULT_ORDER_FLOW_ID;
 
+  // Paynow credentials are optional for seeding — only set them if all three
+  // are present so a partially configured tenant can't reach the gateway with a
+  // half-filled credential set. Absent = the tenant simply has no Paynow config.
+  const paynowIntegrationId = process.env.LOCAL_TENANT_PAYNOW_INTEGRATION_ID?.trim();
+  const paynowIntegrationKey = process.env.LOCAL_TENANT_PAYNOW_INTEGRATION_KEY?.trim();
+  const paynowAuthEmail = process.env.LOCAL_TENANT_PAYNOW_AUTH_EMAIL?.trim();
+  const paynowCredentials =
+    paynowIntegrationId && paynowIntegrationKey && paynowAuthEmail
+      ? {
+          integrationId: paynowIntegrationId,
+          integrationKey: paynowIntegrationKey,
+          authEmail: paynowAuthEmail,
+        }
+      : undefined;
+
   await connectDb();
 
   try {
@@ -91,6 +106,12 @@ const run = async (): Promise<void> => {
               order: orderFlowId,
             };
           }
+          if (paynowCredentials) {
+            existing.paymentCredentials = {
+              ...existing.paymentCredentials,
+              paynow: paynowCredentials,
+            };
+          }
           await existing.save();
           logger.info(
             `[${TAG}] Updated existing local tenant slug="${existing.slug}" id=${existing._id?.toString()}`,
@@ -110,6 +131,7 @@ const run = async (): Promise<void> => {
           whatsappFlowIds: orderFlowId ? { order: orderFlowId } : {},
           paymentMethods: Object.values(PaymentMethod),
           deliveryMethods: Object.values(DeliveryMethod),
+          ...(paynowCredentials ? { paymentCredentials: { paynow: paynowCredentials } } : {}),
         });
         logger.info(
           `[${TAG}] Created local tenant slug="${created.slug}" id=${created._id?.toString()}`,
