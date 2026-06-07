@@ -13,19 +13,14 @@ import type { OrderFlowResponse } from '../../constants/orderFlow';
 import { promptForLocation } from '../delivery/deliveryFlowHandler';
 import { initiateOrderPayment } from '../payments/payment.controller';
 import { sendOrderDetailsFlow } from './whatsappOrderHandler';
-import {
-  resolveUserByPhone,
-  resolveDeliveryAddress,
-} from '../delivery/deliveryAddress.controller';
+import { resolveUserByPhone, resolveDeliveryAddress } from '../delivery/deliveryAddress.controller';
 import type { Types } from 'mongoose';
 
 const isPaymentMethod = (value: unknown): value is PaymentMethod =>
-  typeof value === 'string' &&
-  (Object.values(PaymentMethod) as string[]).includes(value);
+  typeof value === 'string' && (Object.values(PaymentMethod) as string[]).includes(value);
 
 const isDeliveryMethod = (value: unknown): value is DeliveryMethod =>
-  typeof value === 'string' &&
-  (Object.values(DeliveryMethod) as string[]).includes(value);
+  typeof value === 'string' && (Object.values(DeliveryMethod) as string[]).includes(value);
 
 /**
  * Handles the completed order-details flow. The payload arrives via
@@ -36,10 +31,7 @@ const isDeliveryMethod = (value: unknown): value is DeliveryMethod =>
  * onto the pending order created earlier by `whatsappOrderHandler` (located via
  * the orderNumber stashed in Redis under the sender's hash).
  */
-export const orderFlowHandler = async (
-  from: string,
-  payload: OrderFlowResponse,
-): Promise<void> => {
+export const orderFlowHandler = async (from: string, payload: OrderFlowResponse): Promise<void> => {
   logger.info(`[ORDER_FLOW] Processing order-details flow completion from: ${from}`);
 
   const customerName = sanitizeText(payload.full_name);
@@ -50,9 +42,7 @@ export const orderFlowHandler = async (
     ? payload.delivery_method
     : undefined;
   const ecocashNumber =
-    paymentMethod === PaymentMethod.ECOCASH
-      ? sanitizePhone(payload.ecocash_number)
-      : undefined;
+    paymentMethod === PaymentMethod.ECOCASH ? sanitizePhone(payload.ecocash_number) : undefined;
 
   // EcoCash settles to a specific wallet, so the number is mandatory. The flow
   // marks it required client-side, but enforce it here too — re-send the form
@@ -82,7 +72,6 @@ export const orderFlowHandler = async (
     logger.warn(`[ORDER_FLOW] No active order found in session for ${from}`);
     await whatsappMessager.sendFreeFormTextMessage(
       from,
-      // eslint-disable-next-line max-len
       "We couldn't find an active order to attach these details to. Please start a new order from the catalog.",
     );
     return;
@@ -99,11 +88,17 @@ export const orderFlowHandler = async (
       return;
     }
 
-    if (customerName) {order.customerName = customerName;}
+    if (customerName) {
+      order.customerName = customerName;
+    }
 
     order.paymentDetails.status = order.paymentDetails.status ?? PaymentStatus.PENDING;
-    if (paymentMethod) {order.paymentDetails.method = paymentMethod;}
-    if (ecocashNumber) {order.paymentDetails.mobileNumber = ecocashNumber;}
+    if (paymentMethod) {
+      order.paymentDetails.method = paymentMethod;
+    }
+    if (ecocashNumber) {
+      order.paymentDetails.mobileNumber = ecocashNumber;
+    }
 
     if (deliveryMethod) {
       order.deliveryDetails = {
@@ -143,7 +138,7 @@ export const orderFlowHandler = async (
     // Collect/pickup: nothing more to gather, so charge straight away.
     await whatsappMessager.sendFreeFormTextMessage(
       from,
-      // eslint-disable-next-line max-len
+
       `Thanks${customerName ? `, ${customerName}` : ''}! We've captured your details for order ${orderNumber}.`,
     );
     await initiateOrderPayment(from, orderNumber);

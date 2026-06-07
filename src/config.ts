@@ -51,14 +51,9 @@ if (missingEnvironmentVariables.length > 0) {
 export const CONFIG = {
   IS_LOCAL_ENVIRONMENT: isLocal,
   PORT: parseInt(process.env.PORT || '0', 10) || 4000,
-  REDIS_HOST_PORT: process.env.REDIS_HOST_PORT
-    ? parseInt(process.env.REDIS_HOST_PORT)
-    : 6379,
+  REDIS_HOST_PORT: process.env.REDIS_HOST_PORT ? parseInt(process.env.REDIS_HOST_PORT) : 6379,
   REDIS_HOST: process.env.REDIS_HOST || 'localhost',
-  REDIS_CONNECT_TIMEOUT: parseInt(
-    process.env.REDIS_CONNECT_TIMEOUT || '0',
-    10,
-  ) || 90000,
+  REDIS_CONNECT_TIMEOUT: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '0', 10) || 90000,
   WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN || '',
   MONGODB_USERNAME: process.env.MONGODB_USERNAME || '',
   MONGODB_PASSWORD: process.env.MONGODB_PASSWORD || '',
@@ -72,9 +67,7 @@ export const CONFIG = {
   // Explicit PUBLIC_BASE_URL wins; locally we fall back to the ngrok tunnel.
   PUBLIC_BASE_URL:
     process.env.PUBLIC_BASE_URL ||
-    (isLocal && process.env.NGROK_DOMAIN
-      ? `https://${process.env.NGROK_DOMAIN}`
-      : ''),
+    (isLocal && process.env.NGROK_DOMAIN ? `https://${process.env.NGROK_DOMAIN}` : ''),
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? 'LOCAL' : 'PRODUCTION'} environment`,

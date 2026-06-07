@@ -36,7 +36,12 @@ export const flowsHandler = async (req: Request, res: Response): Promise<Respons
   }
 
   const { decryptedBody, aesKeyBuffer, initialVectorBuffer } = decrypted;
-  logger.info('[FLOWS] Decrypted request — action:', decryptedBody.action, '| screen:', decryptedBody.screen);
+  logger.info(
+    '[FLOWS] Decrypted request — action:',
+    decryptedBody.action,
+    '| screen:',
+    decryptedBody.screen,
+  );
 
   // Health-check ping from Meta — must respond with { data: { status: "active" } }
   const responsePayload =

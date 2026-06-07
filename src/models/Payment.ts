@@ -1,10 +1,6 @@
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import {
-  PaymentStatus,
-  PaymentMethod,
-  PaymentProvider,
-} from '../constants/models';
+import { PaymentStatus, PaymentMethod, PaymentProvider } from '../constants/models';
 import { tenantScope } from './plugins/tenantScope';
 
 export { PaymentStatus, PaymentMethod, PaymentProvider };

@@ -37,8 +37,7 @@ export const ORDER_FLOW_SCREENS = {
   DELIVERY_ADDRESS: 'DELIVERY_ADDRESS',
 } as const;
 
-export type OrderFlowScreen =
-  (typeof ORDER_FLOW_SCREENS)[keyof typeof ORDER_FLOW_SCREENS];
+export type OrderFlowScreen = (typeof ORDER_FLOW_SCREENS)[keyof typeof ORDER_FLOW_SCREENS];
 
 export const PAYMENT_METHODS = {
   ECOCASH: 'ecocash',
@@ -46,16 +45,14 @@ export const PAYMENT_METHODS = {
   CARD: 'card',
 } as const;
 
-export type PaymentMethod =
-  (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
+export type PaymentMethod = (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
 
 export const DELIVERY_METHODS = {
   DELIVERY: 'delivery',
   PICKUP: 'pickup',
 } as const;
 
-export type DeliveryMethod =
-  (typeof DELIVERY_METHODS)[keyof typeof DELIVERY_METHODS];
+export type DeliveryMethod = (typeof DELIVERY_METHODS)[keyof typeof DELIVERY_METHODS];
 
 export const PAYMENT_METHOD_OPTIONS = [
   { id: PAYMENT_METHODS.ECOCASH, title: 'EcoCash' },
@@ -93,9 +90,7 @@ export interface DeliveryAddressPayload {
  * collected for the door-delivery option. Method values arrive as the
  * `PaymentMethod` / `DeliveryMethod` enum strings from `constants/models`.
  */
-export interface OrderFlowResponse
-  extends OrderDetailsPayload,
-    Partial<DeliveryAddressPayload> {
+export interface OrderFlowResponse extends OrderDetailsPayload, Partial<DeliveryAddressPayload> {
   flow_token?: string;
 }
 
@@ -136,9 +131,7 @@ export const ORDER_FLOW_JSON = {
               title: { type: 'string' },
             },
           },
-          __example__: toDeliveryMethodOptions(
-            Object.values(DeliveryMethodEnum),
-          ),
+          __example__: toDeliveryMethodOptions(Object.values(DeliveryMethodEnum)),
         },
       },
       layout: {

@@ -80,7 +80,9 @@ export const initiateMobilePayment = async ({
     }
     return { success: false, error: response.error };
   } catch (error) {
-    logger.error(`${TAG} sendMobile failed for ${reference}: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(
+      `${TAG} sendMobile failed for ${reference}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return { success: false, error: 'Could not reach Paynow' };
   }
 };

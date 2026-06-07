@@ -67,7 +67,4 @@ DeliveryAddressSchema.index({ tenantId: 1, area: 1, city: 1 });
 
 DeliveryAddressSchema.plugin(tenantScope);
 
-export default mongoose.model<IDeliveryAddress>(
-  'DeliveryAddress',
-  DeliveryAddressSchema,
-);
+export default mongoose.model<IDeliveryAddress>('DeliveryAddress', DeliveryAddressSchema);

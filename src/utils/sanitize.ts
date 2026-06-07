@@ -19,7 +19,9 @@ export const sanitizeText = (
   value: unknown,
   maxLength: number = MAX_FIELD_LENGTH,
 ): string | undefined => {
-  if (typeof value !== 'string') {return undefined;}
+  if (typeof value !== 'string') {
+    return undefined;
+  }
   const cleaned = value
     // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1f\x7f]/g, ' ')
@@ -31,11 +33,15 @@ export const sanitizeText = (
 
 /** Keep digits and a single leading '+', drop everything else. */
 export const sanitizePhone = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') {return undefined;}
+  if (typeof value !== 'string') {
+    return undefined;
+  }
   const trimmed = value.trim();
   const hasPlus = trimmed.startsWith('+');
   const digits = trimmed.replace(/\D/g, '').slice(0, MAX_PHONE_DIGITS);
-  if (digits.length === 0) {return undefined;}
+  if (digits.length === 0) {
+    return undefined;
+  }
   return hasPlus ? `+${digits}` : digits;
 };
 

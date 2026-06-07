@@ -7,8 +7,7 @@ interface payload {
   'hub.challenge': string;
 }
 export const verifyWebhookToken =
-  () =>
-  async (request: Request<{ Querystring: payload }>, response: Response) => {
+  () => async (request: Request<{ Querystring: payload }>, response: Response) => {
     const verifyToken = CONFIG.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN;
     const mode = request.query['hub.mode'];
     const token = request.query['hub.verify_token'];

@@ -18,7 +18,9 @@ router.post(
       // 200 'ok' so Paynow stops retrying; 400 nudges a retry on bad/forged data.
       res.status(accepted ? 200 : 400).send(accepted ? 'ok' : 'error');
     } catch (error) {
-      logger.error(`[PAYMENT_ROUTE] Paynow webhook error for ${slug}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(
+        `[PAYMENT_ROUTE] Paynow webhook error for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       res.status(500).send('error');
     }
   },
@@ -26,7 +28,7 @@ router.post(
 
 // Unused by mobile push, but Paynow requires the returnUrl to exist.
 router.get('/paynow/return', (_req: Request, res: Response): void => {
-  res.send('Thank you! You can return to WhatsApp — we\'ll confirm your payment there.');
+  res.send("Thank you! You can return to WhatsApp — we'll confirm your payment there.");
 });
 
 export default router;

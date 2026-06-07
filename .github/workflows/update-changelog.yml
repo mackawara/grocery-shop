@@ -1,0 +1,73 @@
+name: Update CHANGELOG
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  update-changelog:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate CHANGELOG entry with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            A pull request has just been merged to `main`. Update `CHANGELOG.md` at the
+            repository root with a new entry summarizing this PR.
+
+            PR metadata:
+            - Number: #${{ github.event.pull_request.number }}
+            - Title: ${{ github.event.pull_request.title }}
+            - Author: @${{ github.event.pull_request.user.login }}
+            - Merge commit: ${{ github.event.pull_request.merge_commit_sha }}
+            - URL: ${{ github.event.pull_request.html_url }}
+            - Merged at: ${{ github.event.pull_request.merged_at }}
+
+            Instructions:
+            1. If `CHANGELOG.md` does not exist, create it with a `# Changelog` header
+               and a brief note that the format follows Keep a Changelog conventions.
+            2. Ensure there is an `## [Unreleased]` section at the top. Under it,
+               maintain these subsections in this order, creating them only as needed:
+               `### Added`, `### Changed`, `### Fixed`, `### Removed`.
+            3. Inspect the PR's diff and body (use `gh pr view ${{ github.event.pull_request.number }} --json title,body,files,additions,deletions`
+               and `gh pr diff ${{ github.event.pull_request.number }}`) to classify
+               the change and write a single concise bullet (one line, user-facing
+               language — not a restatement of the diff). End the bullet with
+               `([#${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }}))`.
+            4. Do not touch any released version sections.
+            5. After editing, open a pull request against `main` with the change:
+               - `git config user.name "github-actions[bot]"`
+               - `git config user.email "41898282+github-actions[bot]@users.noreply.github.com"`
+               - Branch name: `docs/changelog-pr-${{ github.event.pull_request.number }}`
+               - `git checkout -b docs/changelog-pr-${{ github.event.pull_request.number }}`
+               - `git add CHANGELOG.md`
+               - `git commit -m "docs: update CHANGELOG for #${{ github.event.pull_request.number }}"`
+                 (if there is nothing to commit, exit 0 without opening a PR)
+               - `git push -u origin docs/changelog-pr-${{ github.event.pull_request.number }}`
+               - `gh pr create --base main --head docs/changelog-pr-${{ github.event.pull_request.number }} \
+                    --title "docs: changelog for #${{ github.event.pull_request.number }}" \
+                    --body "Automated CHANGELOG update for #${{ github.event.pull_request.number }} (${{ github.event.pull_request.title }})."`
+
+            If the PR is purely internal and does not build or change any
+            user-facing feature (CI config, lockfile bumps with no behavior
+            change, formatting, punctuation, lint fixes, comment-only edits,
+            typo fixes, or refactors that do not change behavior), skip the
+            changelog update and exit without opening a PR.
+          claude_args: |
+            --allowed-tools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr create:*),Bash(git config:*),Bash(git checkout:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git status),Bash(git diff:*),Read,Edit,Write"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

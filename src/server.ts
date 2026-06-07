@@ -16,7 +16,6 @@ app.use(helmet());
 app.use('/whatsapp', whatsappRoutes);
 app.use('/payments', paymentRoutes);
 
-
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Server running and working',
@@ -24,9 +23,9 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 export const startServer = () => {
-    app.listen(CONFIG.PORT, () => {
-        logger.info(`Server is running on port ${CONFIG.PORT}`);
-    });
+  app.listen(CONFIG.PORT, () => {
+    logger.info(`Server is running on port ${CONFIG.PORT}`);
+  });
 };
 
 export default app;

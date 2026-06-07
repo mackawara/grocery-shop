@@ -12,20 +12,12 @@ import {
   resolvePaymentProvider,
 } from '../../constants/models';
 import type { PaymentMethod } from '../../constants/models';
-import {
-  getTenantId,
-  runWithTenant,
-  runWithoutTenant,
-} from '../../context/tenantContext';
+import { getTenantId, runWithTenant, runWithoutTenant } from '../../context/tenantContext';
 import whatsappMessager, { messageComposer } from '../whatsapp/outgoingMessages';
-import { normaliseZimMobile } from '../../utils/sanitize';
 import { buildPaymentRetryButtonId } from '../../constants/payments';
 import { getProviderAdapter } from './providers/registry';
 import { parsePaynowStatusUpdate } from './gateways/paynowClient';
-import type {
-  InitiatePaymentInput,
-  PaymentProviderContext,
-} from './providers/types';
+import type { InitiatePaymentInput, PaymentProviderContext } from './providers/types';
 
 const TAG = '[PAYMENT]';
 
@@ -49,10 +41,12 @@ const sendPaymentRetryPrompt = async (
   await whatsappMessager.sendInteractive(
     from,
     messageComposer.messageWithReplyButtons({
-      // eslint-disable-next-line max-len
       text: `We couldn't complete payment for order ${orderNumber}${reason ? `: ${reason}` : ''}. Would you like to try again?`,
       buttons: [
-        { type: 'reply', reply: { id: buildPaymentRetryButtonId(orderNumber), title: 'Try again' } },
+        {
+          type: 'reply',
+          reply: { id: buildPaymentRetryButtonId(orderNumber), title: 'Try again' },
+        },
       ],
     }),
   );
@@ -62,16 +56,16 @@ const sendPaymentRetryPrompt = async (
  * Charges an order once delivery/collection is sorted. Mobile-money settlement
  * arrives later via webhook. Must run inside an active tenant context.
  */
-export const initiateOrderPayment = async (
-  from: string,
-  orderNumber: string,
-): Promise<void> => {
+export const initiateOrderPayment = async (from: string, orderNumber: string): Promise<void> => {
   logger.info(`${TAG} Initiating payment for order ${orderNumber} (${from})`);
 
   const order = await OrderModel.findOne({ orderNumber });
   if (!order) {
     logger.warn(`${TAG} Order ${orderNumber} not found`);
-    await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we could not find your order to process payment.');
+    await whatsappMessager.sendFreeFormTextMessage(
+      from,
+      'Sorry, we could not find your order to process payment.',
+    );
     return;
   }
 
@@ -82,22 +76,32 @@ export const initiateOrderPayment = async (
     (p) => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.PAID,
   );
   if (inFlight) {
-    logger.info(`${TAG} Order ${orderNumber} already has a ${inFlight.status} payment — skipping re-initiation`);
+    logger.info(
+      `${TAG} Order ${orderNumber} already has a ${inFlight.status} payment — skipping re-initiation`,
+    );
     return;
   }
 
   const method = order.paymentDetails?.method as PaymentMethod | undefined;
   if (!method) {
     logger.warn(`${TAG} Order ${orderNumber} has no payment method set`);
-    await whatsappMessager.sendFreeFormTextMessage(from, 'We could not determine your payment method. Please restart your order.');
+    await whatsappMessager.sendFreeFormTextMessage(
+      from,
+      'We could not determine your payment method. Please restart your order.',
+    );
     return;
   }
 
   // credentials are select:false, so pull them explicitly.
-  const tenant = await Tenant.findById(getTenantId()).select('+paymentCredentials paymentRouting slug');
+  const tenant = await Tenant.findById(getTenantId()).select(
+    '+paymentCredentials paymentRouting slug',
+  );
   if (!tenant) {
     logger.error(`${TAG} Tenant ${getTenantId()} not found while paying order ${orderNumber}`);
-    await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we hit a configuration issue. Please try again shortly.');
+    await whatsappMessager.sendFreeFormTextMessage(
+      from,
+      'Sorry, we hit a configuration issue. Please try again shortly.',
+    );
     return;
   }
 
@@ -112,17 +116,19 @@ export const initiateOrderPayment = async (
     session.startTransaction();
     try {
       await PaymentModel.create(
-        [{
-          order: order._id as Types.ObjectId,
-          orderNumber,
-          provider,
-          method,
-          amount: order.totalAmount,
-          currency: DEFAULT_CURRENCY,
-          status: PaymentStatus.PENDING,
-          whatsappFrom: from,
-          attempts,
-        }],
+        [
+          {
+            order: order._id as Types.ObjectId,
+            orderNumber,
+            provider,
+            method,
+            amount: order.totalAmount,
+            currency: DEFAULT_CURRENCY,
+            status: PaymentStatus.PENDING,
+            whatsappFrom: from,
+            attempts,
+          },
+        ],
         { session },
       );
       order.status = OrderStatus.CONFIRMED;
@@ -131,16 +137,23 @@ export const initiateOrderPayment = async (
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();
-      logger.error(`${TAG} COD confirmation failed for ${orderNumber}: ${error instanceof Error ? error.message : String(error)}`);
-      await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we hit an issue confirming your order. Please try again.');
+      logger.error(
+        `${TAG} COD confirmation failed for ${orderNumber}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      await whatsappMessager.sendFreeFormTextMessage(
+        from,
+        'Sorry, we hit an issue confirming your order. Please try again.',
+      );
       return;
     } finally {
       session.endSession();
     }
-    logger.info(`${TAG} Order ${orderNumber} confirmed for cash on delivery — payment PENDING ${DEFAULT_CURRENCY} ${order.totalAmount.toFixed(2)}, settle manually`);
+    logger.info(
+      `${TAG} Order ${orderNumber} confirmed for cash on delivery — payment PENDING ${DEFAULT_CURRENCY} ${order.totalAmount.toFixed(2)}, settle manually`,
+    );
     await whatsappMessager.sendFreeFormTextMessage(
       from,
-      // eslint-disable-next-line max-len
+
       `Your order ${orderNumber} is confirmed! Please have ${DEFAULT_CURRENCY} ${order.totalAmount.toFixed(2)} ready to pay on delivery.`,
     );
     return;
@@ -154,8 +167,7 @@ export const initiateOrderPayment = async (
     return;
   }
 
-  const payerMobileNumber =
-    order.paymentDetails.mobileNumber;
+  const payerMobileNumber = order.paymentDetails.mobileNumber;
 
   const input: InitiatePaymentInput = {
     orderNumber,
@@ -208,23 +220,33 @@ export const initiateOrderPayment = async (
     await order.save({ session });
     await session.commitTransaction();
   } catch (error) {
-
     await session.abortTransaction();
-    logger.error(`${TAG} Failed to persist payment result for ${orderNumber}: ${error instanceof Error ? error.message : String(error)}`);
-    await PaymentModel.updateOne({ _id: payment._id }, { status: PaymentStatus.FAILED }).catch(() => {});
-    await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we hit an issue processing your payment. Please try again.');
+    logger.error(
+      `${TAG} Failed to persist payment result for ${orderNumber}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    await PaymentModel.updateOne({ _id: payment._id }, { status: PaymentStatus.FAILED }).catch(
+      () => {},
+    );
+    await whatsappMessager.sendFreeFormTextMessage(
+      from,
+      'Sorry, we hit an issue processing your payment. Please try again.',
+    );
     return;
   } finally {
     session.endSession();
   }
 
   if (!result.success) {
-    logger.warn(`${TAG} Payment FAILED to start for order ${orderNumber} via ${provider}: ${result.error}`);
+    logger.warn(
+      `${TAG} Payment FAILED to start for order ${orderNumber} via ${provider}: ${result.error}`,
+    );
     await sendPaymentRetryPrompt(from, orderNumber, result.error);
     return;
   }
 
-  logger.info(`${TAG} Payment PENDING for order ${orderNumber} via ${provider} (${DEFAULT_CURRENCY} ${order.totalAmount.toFixed(2)}) — push sent, awaiting customer approval`);
+  logger.info(
+    `${TAG} Payment PENDING for order ${orderNumber} via ${provider} (${DEFAULT_CURRENCY} ${order.totalAmount.toFixed(2)}) — push sent, awaiting customer approval`,
+  );
   await whatsappMessager.sendFreeFormTextMessage(
     from,
     `Payment request sent for order ${orderNumber}. Please approve the prompt on your phone.`,
@@ -262,13 +284,19 @@ export const isPaynowWebhookAccepted = async (
   let status: PaymentStatus;
   let rawStatus: string | undefined;
   try {
-    const update = parsePaynowStatusUpdate(rawBody, credentials.integrationId, credentials.integrationKey);
+    const update = parsePaynowStatusUpdate(
+      rawBody,
+      credentials.integrationId,
+      credentials.integrationKey,
+    );
     reference = update.reference;
     pollUrl = update.pollUrl;
     status = update.status;
     rawStatus = update.rawStatus;
   } catch (error) {
-    logger.error(`${TAG} Paynow webhook verification failed for tenant=${tenantSlug}: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(
+      `${TAG} Paynow webhook verification failed for tenant=${tenantSlug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return false;
   }
   if (!reference) {
@@ -276,81 +304,103 @@ export const isPaynowWebhookAccepted = async (
     return false;
   }
   const orderNumber = reference;
-  logger.info(`${TAG} Paynow callback for order ${orderNumber}: status=${status} (paynow="${rawStatus}")`);
+  logger.info(
+    `${TAG} Paynow callback for order ${orderNumber}: status=${status} (paynow="${rawStatus}")`,
+  );
 
-  return runWithTenant(tenant._id as Types.ObjectId, async () => {
-    // Match the exact attempt by its poll URL (stored as providerReference);
-    // ordering by createdAt alone settles the wrong record once an order has
-    // retried. Fall back to the latest attempt only if Paynow omits the URL.
-    const payment = pollUrl
-      ? await PaymentModel.findOne({ orderNumber, providerReference: pollUrl })
-      : await PaymentModel.findOne({ orderNumber }).sort({ createdAt: -1 });
-    if (!payment) {
-      logger.warn(`${TAG} Paynow webhook: no payment for order ${orderNumber}${pollUrl ? ` (pollUrl=${pollUrl})` : ''}`);
-      return false;
-    }
-
-    // Idempotent: ignore repeats once we've already settled this attempt.
-    if (payment.status === status) {
-      logger.info(`${TAG} Paynow webhook: order ${orderNumber} already ${status}, ignoring repeat`);
-      return true;
-    }
-
-    payment.status = status;
-    if (status === PaymentStatus.PAID) {
-      payment.paidAt = new Date();
-    }
-
-    // Settle the payment and its order in one transaction so a failure mid-update
-    // can't leave the payment marked PAID while the order stays unconfirmed.
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    let order;
-    try {
-      order = await OrderModel.findOne({ orderNumber }).session(session);
-      if (order) {
-        order.paymentDetails.status = status;
-        if (status === PaymentStatus.PAID) {
-          order.status = OrderStatus.CONFIRMED;
-        }
-        await order.save({ session });
+  return runWithTenant(
+    tenant._id as Types.ObjectId,
+    async () => {
+      // Match the exact attempt by its poll URL (stored as providerReference);
+      // ordering by createdAt alone settles the wrong record once an order has
+      // retried. Fall back to the latest attempt only if Paynow omits the URL.
+      const payment = pollUrl
+        ? await PaymentModel.findOne({ orderNumber, providerReference: pollUrl })
+        : await PaymentModel.findOne({ orderNumber }).sort({ createdAt: -1 });
+      if (!payment) {
+        logger.warn(
+          `${TAG} Paynow webhook: no payment for order ${orderNumber}${pollUrl ? ` (pollUrl=${pollUrl})` : ''}`,
+        );
+        return false;
       }
-      await payment.save({ session });
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      const reason = error instanceof Error ? error.message : String(error);
-      logger.error(`${TAG} Failed to settle order ${orderNumber}: ${reason}`);
-      return false;
-    } finally {
-      session.endSession();
-    }
 
-    // Notify only after the commit succeeds — an aborted write must not send messages.
-    if (order) {
-      // The WhatsApp sender id — not the mobile-money number, which isn't a recipient.
-      const from = payment.whatsappFrom;
-      if (from) {
-        if (status === PaymentStatus.PAID) {
-          await whatsappMessager.sendFreeFormTextMessage(
-            from,
-            `Payment received for order ${orderNumber} — thank you! We'll be in touch shortly. 🎉`,
+      // Settle the payment and its order in one transaction so a failure mid-update
+      // can't leave the payment marked PAID while the order stays unconfirmed.
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      let order;
+      let settledPayment;
+      try {
+        // Atomically claim the transition: the `$ne` filter only matches if this
+        // attempt hasn't already reached `status`, so concurrent Paynow retries
+        // can't both pass the idempotency gate and double-notify the customer.
+        // A null result means another callback already settled it to `status`.
+        settledPayment = await PaymentModel.findOneAndUpdate(
+          { _id: payment._id, status: { $ne: status } },
+          {
+            $set: {
+              status,
+              ...(status === PaymentStatus.PAID ? { paidAt: new Date() } : {}),
+            },
+          },
+          { new: true, session },
+        );
+        if (!settledPayment) {
+          await session.abortTransaction();
+          logger.info(
+            `${TAG} Paynow webhook: order ${orderNumber} already ${status}, ignoring repeat`,
           );
-        } else if (status === PaymentStatus.FAILED) {
-          await sendPaymentRetryPrompt(from, orderNumber);
+          return true;
+        }
+        order = await OrderModel.findOne({ orderNumber }).session(session);
+        if (order) {
+          order.paymentDetails.status = status;
+          if (status === PaymentStatus.PAID) {
+            order.status = OrderStatus.CONFIRMED;
+          }
+          await order.save({ session });
+        }
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        const reason = error instanceof Error ? error.message : String(error);
+        logger.error(`${TAG} Failed to settle order ${orderNumber}: ${reason}`);
+        return false;
+      } finally {
+        session.endSession();
+      }
+
+      // Notify only after the commit succeeds — an aborted write must not send messages.
+      if (order) {
+        // The WhatsApp sender id — not the mobile-money number, which isn't a recipient.
+        const from = settledPayment.whatsappFrom;
+        if (from) {
+          if (status === PaymentStatus.PAID) {
+            await whatsappMessager.sendFreeFormTextMessage(
+              from,
+              `Payment received for order ${orderNumber} — thank you! We'll be in touch shortly. 🎉`,
+            );
+          } else if (status === PaymentStatus.FAILED) {
+            await sendPaymentRetryPrompt(from, orderNumber);
+          }
         }
       }
-    }
 
-    if (status === PaymentStatus.PAID) {
-      logger.info(`${TAG} Payment PAID for order ${orderNumber} (${payment.currency} ${payment.amount})`);
-    } else if (rawStatus === 'cancelled') {
-      logger.warn(`${TAG} Payment CANCELLED by customer for order ${orderNumber}`);
-    } else if (status === PaymentStatus.FAILED) {
-      logger.warn(`${TAG} Payment FAILED for order ${orderNumber} (paynow="${rawStatus}")`);
-    } else {
-      logger.info(`${TAG} Payment for order ${orderNumber} now ${status} (paynow="${rawStatus}")`);
-    }
-    return true;
-  }, tenant.slug);
+      if (status === PaymentStatus.PAID) {
+        logger.info(
+          `${TAG} Payment PAID for order ${orderNumber} (${settledPayment.currency} ${settledPayment.amount})`,
+        );
+      } else if (rawStatus === 'cancelled') {
+        logger.warn(`${TAG} Payment CANCELLED by customer for order ${orderNumber}`);
+      } else if (status === PaymentStatus.FAILED) {
+        logger.warn(`${TAG} Payment FAILED for order ${orderNumber} (paynow="${rawStatus}")`);
+      } else {
+        logger.info(
+          `${TAG} Payment for order ${orderNumber} now ${status} (paynow="${rawStatus}")`,
+        );
+      }
+      return true;
+    },
+    tenant.slug,
+  );
 };
