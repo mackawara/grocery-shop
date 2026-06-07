@@ -2,10 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { Types } from 'mongoose';
 import Tenant from '../../models/Tenant';
 import { TenantStatus } from '../../constants/models';
-import {
-  runWithTenant,
-  runWithoutTenant,
-} from '../../context/tenantContext';
+import { runWithTenant, runWithoutTenant } from '../../context/tenantContext';
 import { logger } from '../../services/logger';
 import type { WebhookNotificationBody } from '../../types/types';
 
@@ -15,13 +12,10 @@ export const whatsappTenantResolver = async (
   next: NextFunction,
 ): Promise<void> => {
   const body = req.body as WebhookNotificationBody;
-  const phoneNumberId =
-    body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+  const phoneNumberId = body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
 
   if (!phoneNumberId) {
-    logger.warn(
-      '[whatsappTenantResolver] no phone_number_id in webhook payload — acking 200',
-    );
+    logger.warn('[whatsappTenantResolver] no phone_number_id in webhook payload — acking 200');
     res.status(200).json({ success: true });
     return;
   }
@@ -58,9 +52,7 @@ export const whatsappTenantResolver = async (
   // SUSPENDED, or one added to the enum later) is rejected by default.
   const ALLOWED_STATUSES = [TenantStatus.ACTIVE, TenantStatus.TRIAL];
   if (!ALLOWED_STATUSES.includes(tenant.status)) {
-    logger.warn(
-      `[whatsappTenantResolver] tenant ${tenant._id} is ${tenant.status} — acking 200`,
-    );
+    logger.warn(`[whatsappTenantResolver] tenant ${tenant._id} is ${tenant.status} — acking 200`);
     res.status(200).json({ success: true });
     return;
   }

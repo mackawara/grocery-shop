@@ -25,12 +25,22 @@ export const isWhatsAppMessageProcessed = (messageId: string): Promise<boolean> 
 
 export const textHandler = async (from: string, text: Text['text']): Promise<void> => {
   logger.info('[TEXT_MESSAGE] : Processing text message from:', from, '| body:', text.body);
- await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
+  await whatsappMessager.sendWhatsAppCatalogMessage({ phone: from });
 };
 
-const buttonReplyHandler = async (from: string, interactive: InteractiveButtonReplyNotification): Promise<void> => {
+const buttonReplyHandler = async (
+  from: string,
+  interactive: InteractiveButtonReplyNotification,
+): Promise<void> => {
   const { button_reply } = interactive;
-  logger.info('[INTERACTIVE_BUTTON_REPLY] : from:', from, '| id:', button_reply.id, '| title:', button_reply.title);
+  logger.info(
+    '[INTERACTIVE_BUTTON_REPLY] : from:',
+    from,
+    '| id:',
+    button_reply.id,
+    '| title:',
+    button_reply.title,
+  );
 
   // "Try again" on a failed payment — re-charge the order in the button id.
   const retryOrderNumber = parsePaymentRetryButtonId(button_reply.id);
@@ -39,19 +49,44 @@ const buttonReplyHandler = async (from: string, interactive: InteractiveButtonRe
     return;
   }
 
-  await whatsappMessager.sendFreeFormTextMessage(from, `Button reply received — id: ${button_reply.id}, title: "${button_reply.title}"`);
+  await whatsappMessager.sendFreeFormTextMessage(
+    from,
+    `Button reply received — id: ${button_reply.id}, title: "${button_reply.title}"`,
+  );
 };
 
-const listReplyHandler = async (from: string, interactive: InteractiveListReplyNotifications): Promise<void> => {
+const listReplyHandler = async (
+  from: string,
+  interactive: InteractiveListReplyNotifications,
+): Promise<void> => {
   const { list_reply } = interactive;
-  logger.info('[INTERACTIVE_LIST_REPLY] : from:', from, '| id:', list_reply.id, '| title:', list_reply.title);
-  await whatsappMessager.sendFreeFormTextMessage(from, `List reply received — id: ${list_reply.id}, title: "${list_reply.title}"`);
+  logger.info(
+    '[INTERACTIVE_LIST_REPLY] : from:',
+    from,
+    '| id:',
+    list_reply.id,
+    '| title:',
+    list_reply.title,
+  );
+  await whatsappMessager.sendFreeFormTextMessage(
+    from,
+    `List reply received — id: ${list_reply.id}, title: "${list_reply.title}"`,
+  );
 };
 
-// eslint-disable-next-line max-len
-const nfmReplyHandler = async (from: string, interactive: InteractiveNfmReplyNotification): Promise<void> => {
+const nfmReplyHandler = async (
+  from: string,
+  interactive: InteractiveNfmReplyNotification,
+): Promise<void> => {
   const { nfm_reply } = interactive;
-  logger.info('[INTERACTIVE_NFM_REPLY] : from:', from, '| name:', nfm_reply.name, '| response:', nfm_reply.response_json);
+  logger.info(
+    '[INTERACTIVE_NFM_REPLY] : from:',
+    from,
+    '| name:',
+    nfm_reply.name,
+    '| response:',
+    nfm_reply.response_json,
+  );
 
   let payload: Record<string, unknown>;
   try {
@@ -65,17 +100,25 @@ const nfmReplyHandler = async (from: string, interactive: InteractiveNfmReplyNot
   const flowToken = typeof payload.flow_token === 'string' ? payload.flow_token : undefined;
   switch (flowToken) {
     case ORDER_DETAILS_FLOW_TOKEN:
-logger.info(`[INTERACTIVE_NFM_REPLY] : Routing to orderFlowHandler for ${from} with flow_token: ${flowToken}`);
+      logger.info(
+        `[INTERACTIVE_NFM_REPLY] : Routing to orderFlowHandler for ${from} with flow_token: ${flowToken}`,
+      );
       await orderFlowHandler(from, payload as unknown as OrderFlowResponse);
       break;
     default:
       logger.info('[INTERACTIVE_NFM_REPLY] : Unhandled flow_token:', flowToken, 'from:', from);
-      // eslint-disable-next-line max-len
-      await whatsappMessager.sendFreeFormTextMessage(from, `Flow response received — form: "${nfm_reply.name}"`);
+
+      await whatsappMessager.sendFreeFormTextMessage(
+        from,
+        `Flow response received — form: "${nfm_reply.name}"`,
+      );
   }
 };
 
-export const interactiveHandler = async (from: string, interactive: InteractivePayLoad): Promise<void> => {
+export const interactiveHandler = async (
+  from: string,
+  interactive: InteractivePayLoad,
+): Promise<void> => {
   switch (interactive.type) {
     case 'button_reply':
       await buttonReplyHandler(from, interactive);
@@ -91,12 +134,35 @@ export const interactiveHandler = async (from: string, interactive: InteractiveP
   }
 };
 
-export const reactionHandler = async (from: string, reaction: ReactionMessageNotification['reaction']): Promise<void> => {
-  logger.info('[REACTION_MESSAGE] : from:', from, '| emoji:', reaction.emoji, '| on message:', reaction.message_id);
-  await whatsappMessager.sendFreeFormTextMessage(from, `Reaction received — emoji: ${reaction.emoji}`);
+export const reactionHandler = async (
+  from: string,
+  reaction: ReactionMessageNotification['reaction'],
+): Promise<void> => {
+  logger.info(
+    '[REACTION_MESSAGE] : from:',
+    from,
+    '| emoji:',
+    reaction.emoji,
+    '| on message:',
+    reaction.message_id,
+  );
+  await whatsappMessager.sendFreeFormTextMessage(
+    from,
+    `Reaction received — emoji: ${reaction.emoji}`,
+  );
 };
 
-export const locationHandler = async (from: string, location: LocationMessageNotification['location']): Promise<void> => {
-  logger.info('[LOCATION_MESSAGE] : from:', from, '| lat:', location.latitude, '| lng:', location.longitude);
+export const locationHandler = async (
+  from: string,
+  location: LocationMessageNotification['location'],
+): Promise<void> => {
+  logger.info(
+    '[LOCATION_MESSAGE] : from:',
+    from,
+    '| lat:',
+    location.latitude,
+    '| lng:',
+    location.longitude,
+  );
   await handleDeliveryLocation(from, location);
 };

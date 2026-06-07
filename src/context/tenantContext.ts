@@ -23,22 +23,14 @@ export const runWithTenant = <T>(
   tenantId: Types.ObjectId | string,
   fn: () => T,
   slug?: string,
-): T =>
-  storage.run({ tenantId: tenantId.toString(), tenantSlug: slug }, fn);
+): T => storage.run({ tenantId: tenantId.toString(), tenantSlug: slug }, fn);
 
-export const runWithoutTenant = <T>(
-  reason: string,
-  queryDescription: string,
-  fn: () => T,
-): T => {
-  logger.warn(
-    `[tenantContext] BYPASS reason="${reason}" query="${queryDescription}"`,
-  );
+export const runWithoutTenant = <T>(reason: string, queryDescription: string, fn: () => T): T => {
+  logger.warn(`[tenantContext] BYPASS reason="${reason}" query="${queryDescription}"`);
   return storage.run({ tenantId: '', bypass: true }, fn);
 };
 
-export const getTenantContext = (): TenantContext | undefined =>
-  storage.getStore();
+export const getTenantContext = (): TenantContext | undefined => storage.getStore();
 
 export const getTenantId = (): string | undefined => {
   const ctx = storage.getStore();
@@ -61,8 +53,7 @@ export const requireTenantId = (operation: string): string => {
   return ctx.tenantId;
 };
 
-export const isBypassing = (): boolean =>
-  storage.getStore()?.bypass === true;
+export const isBypassing = (): boolean => storage.getStore()?.bypass === true;
 
 export const getTenantSlug = (): string | undefined => {
   const ctx = storage.getStore();

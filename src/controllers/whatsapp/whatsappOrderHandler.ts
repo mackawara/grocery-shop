@@ -8,10 +8,7 @@ import { OrderItem } from '../../models/OrderItem';
 import { setRedisHashKeyValuePair } from '../redis/redis.controller';
 import Tenant from '../../models/Tenant';
 import { getTenantId } from '../../context/tenantContext';
-import {
-  toPaymentMethodOptions,
-  toDeliveryMethodOptions,
-} from '../../constants/models';
+import { toPaymentMethodOptions, toDeliveryMethodOptions } from '../../constants/models';
 import { DEFAULT_ORDER_FLOW_ID, ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow';
 // import User from "../../models/User"; // TODO: uncomment once User model is fully defined
 
@@ -47,8 +44,9 @@ export const sendOrderDetailsFlow = async (from: string): Promise<void> => {
 };
 
 export const whatsappOrderHandler = async (from: string, order: Order): Promise<void> => {
-  // eslint-disable-next-line max-len
-  logger.info(`[ORDER_MESSAGE] Processing catalog order from: ${from} | catalog: ${order.catalog_id} | items: ${order.product_items.length}`);
+  logger.info(
+    `[ORDER_MESSAGE] Processing catalog order from: ${from} | catalog: ${order.catalog_id} | items: ${order.product_items.length}`,
+  );
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -109,27 +107,38 @@ export const whatsappOrderHandler = async (from: string, order: Order): Promise<
     await session.commitTransaction();
     logger.info(`[ORDER_MESSAGE] Order ${orderNumber} committed for ${from}`);
 
-    // eslint-disable-next-line max-len
-    await setRedisHashKeyValuePair({ hashName: from, key: 'orderNumber', value: orderNumber, expiry: ORDER_SESSION_TTL_SECONDS });
-    // eslint-disable-next-line max-len
-    await setRedisHashKeyValuePair({ hashName: from, key: 'items', value: JSON.stringify(itemSummaries), expiry: ORDER_SESSION_TTL_SECONDS });
+    await setRedisHashKeyValuePair({
+      hashName: from,
+      key: 'orderNumber',
+      value: orderNumber,
+      expiry: ORDER_SESSION_TTL_SECONDS,
+    });
+
+    await setRedisHashKeyValuePair({
+      hashName: from,
+      key: 'items',
+      value: JSON.stringify(itemSummaries),
+      expiry: ORDER_SESSION_TTL_SECONDS,
+    });
 
     const itemsList = itemSummaries
-      .map(i => `• ${i.productId} x${i.quantity} — $${i.price.toFixed(2)}`)
+      .map((i) => `• ${i.productId} x${i.quantity} — $${i.price.toFixed(2)}`)
       .join('\n');
 
     await whatsappMessager.sendFreeFormTextMessage(
       from,
-      // eslint-disable-next-line max-len
+
       `Order received!\n\n${itemsList}\n\nTotal: $${totalAmount.toFixed(2)}\nOrder #: ${orderNumber}\n\nWe'll be in touch shortly to confirm your order.`,
     );
     await sendOrderDetailsFlow(from);
-
   } catch (error) {
     await session.abortTransaction();
     logger.error(`[ORDER_MESSAGE] Error processing order from ${from}:`, error);
-    // eslint-disable-next-line max-len
-    await whatsappMessager.sendFreeFormTextMessage(from, 'Sorry, we ran into an issue processing your order. Please try again.');
+
+    await whatsappMessager.sendFreeFormTextMessage(
+      from,
+      'Sorry, we ran into an issue processing your order. Please try again.',
+    );
   } finally {
     session.endSession();
   }

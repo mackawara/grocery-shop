@@ -74,8 +74,7 @@ export const DEFAULT_PAYMENT_ROUTING: Record<PaymentMethod, PaymentProvider> = {
 export const resolvePaymentProvider = (
   method: PaymentMethod,
   routing?: Partial<Record<PaymentMethod, PaymentProvider>>,
-): PaymentProvider =>
-  routing?.[method] ?? DEFAULT_PAYMENT_ROUTING[method];
+): PaymentProvider => routing?.[method] ?? DEFAULT_PAYMENT_ROUTING[method];
 
 export enum DeliveryMethod {
   COLLECT = 'collect',
@@ -100,17 +99,13 @@ export interface MethodOption {
   title: string;
 }
 
-export const toPaymentMethodOptions = (
-  methods: PaymentMethod[],
-): MethodOption[] =>
+export const toPaymentMethodOptions = (methods: PaymentMethod[]): MethodOption[] =>
   methods.map((method) => ({
     id: method,
     title: PAYMENT_METHOD_LABELS[method] ?? method,
   }));
 
-export const toDeliveryMethodOptions = (
-  methods: DeliveryMethod[],
-): MethodOption[] =>
+export const toDeliveryMethodOptions = (methods: DeliveryMethod[]): MethodOption[] =>
   methods.map((method) => ({
     id: method,
     title: DELIVERY_METHOD_LABELS[method] ?? method,

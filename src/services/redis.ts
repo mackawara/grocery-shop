@@ -19,9 +19,7 @@ export class RedisService {
         connectTimeout: CONFIG.REDIS_CONNECT_TIMEOUT,
         keepAlive: true,
         reconnectStrategy: (retries, error) => {
-          logger.warn(
-            `[${TAG}] Redis attempt #${retries} reconnect failed: ${error}`,
-          );
+          logger.warn(`[${TAG}] Redis attempt #${retries} reconnect failed: ${error}`);
           if (retries > 10) {
             logger.error(`[${TAG}] Redis reconnect failed, shutting down`);
             process.exit(1);
@@ -47,7 +45,6 @@ export class RedisService {
 
     this.client.on('reconnecting', () => {
       logger.info(
-        // eslint-disable-next-line max-len
         `[${TAG}] Reconnecting to Redis. HOST: ${CONFIG.REDIS_HOST}. PORT: ${CONFIG.REDIS_HOST_PORT}`,
       );
     });

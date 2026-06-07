@@ -8,7 +8,9 @@ const TAG = '[DELIVERY_ADDRESS]';
 
 export const resolveUserByPhone = async (phoneNumber: string): Promise<IUser> => {
   const existing = await UserModel.findOne({ phoneNumber });
-  if (existing) {return existing;}
+  if (existing) {
+    return existing;
+  }
 
   const created = new UserModel({ phoneNumber });
   await created.save();
@@ -42,10 +44,7 @@ export const resolveDeliveryAddress = async ({
   let addressId: Types.ObjectId;
 
   if (existingAddressId) {
-    await DeliveryAddressModel.updateOne(
-      { _id: existingAddressId },
-      { $set: typedFields },
-    );
+    await DeliveryAddressModel.updateOne({ _id: existingAddressId }, { $set: typedFields });
     addressId = existingAddressId;
   } else {
     const created = await new DeliveryAddressModel({

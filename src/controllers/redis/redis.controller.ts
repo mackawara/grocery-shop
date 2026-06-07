@@ -34,10 +34,7 @@ export const setRedisHashKeyValuePair = async ({
   }
 };
 
-export const getRedisHashValue = async (
-  hashName: string,
-  key: string,
-): Promise<string | null> => {
+export const getRedisHashValue = async (hashName: string, key: string): Promise<string | null> => {
   if (!hashName || !key) {
     logger.warn(`[${TAG}] getRedisHashValue: hashName and key are required`);
     return null;
@@ -45,16 +42,14 @@ export const getRedisHashValue = async (
 
   const scopedHash = tenantKey(hashName);
   try {
-    return await redisClient.hGet(scopedHash, key) ?? null;
+    return (await redisClient.hGet(scopedHash, key)) ?? null;
   } catch (error) {
     logger.error(`[${TAG}] Error getting ${hashName}:${key}: ${error}`);
     return null;
   }
 };
 
-export const getRedisHash = async (
-  hashName: string,
-): Promise<Record<string, string> | null> => {
+export const getRedisHash = async (hashName: string): Promise<Record<string, string> | null> => {
   if (!hashName) {
     logger.warn(`[${TAG}] getRedisHash: hashName is required`);
     return null;
@@ -73,10 +68,7 @@ export const getRedisHash = async (
   }
 };
 
-export const deleteRedisHashField = async (
-  hashName: string,
-  key: string,
-): Promise<SetResult> => {
+export const deleteRedisHashField = async (hashName: string, key: string): Promise<SetResult> => {
   if (!hashName || !key) {
     return { success: false, error: 'hashName and key are required' };
   }
@@ -92,10 +84,7 @@ export const deleteRedisHashField = async (
   }
 };
 
-export const isMessageProcessed = async (
-  key: string,
-  ttlSeconds: number,
-): Promise<boolean> => {
+export const isMessageProcessed = async (key: string, ttlSeconds: number): Promise<boolean> => {
   const scopedKey = tenantKey(key);
   try {
     const result = await redisClient.set(scopedKey, '1', { NX: true, EX: ttlSeconds });
@@ -105,7 +94,9 @@ export const isMessageProcessed = async (
     // message as already processed so it is skipped rather than reprocessed.
     // Returning false here would let every redelivery through during an outage
     // and create duplicate orders.
-    logger.error(`[${TAG}] Error in isMessageProcessed for ${key}, failing closed (treating as processed): ${error}`);
+    logger.error(
+      `[${TAG}] Error in isMessageProcessed for ${key}, failing closed (treating as processed): ${error}`,
+    );
     return true;
   }
 };

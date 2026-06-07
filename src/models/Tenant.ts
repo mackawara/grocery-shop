@@ -1,4 +1,4 @@
-import type { Document} from 'mongoose';
+import type { Document } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 import {
   TenantStatus,
@@ -7,7 +7,6 @@ import {
   PaymentProvider,
   DeliveryMethod,
 } from '../constants/models';
-
 
 export interface IWhatsappFlowIds {
   order?: string;
@@ -207,9 +206,7 @@ TenantSchema.pre<ITenant>('validate', async function () {
   const TenantModel = this.constructor as mongoose.Model<ITenant>;
   let candidate = base;
   let suffix = 1;
-  while (
-    await TenantModel.exists({ slug: candidate, _id: { $ne: this._id } })
-  ) {
+  while (await TenantModel.exists({ slug: candidate, _id: { $ne: this._id } })) {
     suffix += 1;
     candidate = `${base}-${suffix}`;
   }

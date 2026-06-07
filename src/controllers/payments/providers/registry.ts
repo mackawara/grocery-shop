@@ -8,6 +8,5 @@ const PROVIDERS: Partial<Record<PaymentProvider, PaymentProviderAdapter>> = {
   [PaymentProvider.PAYNOW]: paynowProvider,
 };
 
-export const getProviderAdapter = (
-  provider: PaymentProvider,
-): PaymentProviderAdapter | undefined => PROVIDERS[provider];
+export const getProviderAdapter = (provider: PaymentProvider): PaymentProviderAdapter | undefined =>
+  PROVIDERS[provider];

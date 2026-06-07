@@ -24,14 +24,26 @@ export const paynowProvider: PaymentProviderAdapter = {
   ): Promise<InitiatePaymentResult> {
     const credentials = context.credentials?.paynow;
     if (!credentials) {
-      return { success: false, status: PaymentStatus.FAILED, error: 'Paynow is not configured for this merchant' };
+      return {
+        success: false,
+        status: PaymentStatus.FAILED,
+        error: 'Paynow is not configured for this merchant',
+      };
     }
     if (!input.payerMobileNumber) {
-      return { success: false, status: PaymentStatus.FAILED, error: 'A mobile number is required for Paynow payments' };
+      return {
+        success: false,
+        status: PaymentStatus.FAILED,
+        error: 'A mobile number is required for Paynow payments',
+      };
     }
     const methodToken = PAYNOW_METHOD_TOKEN[input.method];
     if (!methodToken) {
-      return { success: false, status: PaymentStatus.FAILED, error: `Paynow does not support method ${input.method}` };
+      return {
+        success: false,
+        status: PaymentStatus.FAILED,
+        error: `Paynow does not support method ${input.method}`,
+      };
     }
 
     const response = await initiateMobilePayment({

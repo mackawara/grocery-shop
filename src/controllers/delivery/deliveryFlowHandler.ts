@@ -4,10 +4,7 @@ import OrderModel from '../../models/Order';
 import DeliveryAddressModel from '../../models/DeliveryAddress';
 import Tenant from '../../models/Tenant';
 import { getTenantId } from '../../context/tenantContext';
-import {
-  getRedisHashValue,
-  setRedisHashKeyValuePair,
-} from '../redis/redis.controller';
+import { getRedisHashValue, setRedisHashKeyValuePair } from '../redis/redis.controller';
 import { haversineKm } from '../../utils/geo';
 import { initiateOrderPayment } from '../payments/payment.controller';
 
@@ -29,7 +26,7 @@ export const promptForLocation = async (from: string): Promise<void> => {
   try {
     const result = await whatsappMessager.sendLocationRequestMessage(
       from,
-      // eslint-disable-next-line max-len
+
       'Thanks! 📍 Please share your delivery location pin so our driver can find you. Tap the attachment icon → Location → Send your current location.',
     );
     if (result.success) {
@@ -99,10 +96,7 @@ export const handleDeliveryLocation = async (
       ...(location.address ? { address: location.address } : {}),
     };
 
-    await DeliveryAddressModel.updateOne(
-      { _id: addressId },
-      { $set: { location_gps: gps } },
-    );
+    await DeliveryAddressModel.updateOne({ _id: addressId }, { $set: { location_gps: gps } });
 
     // Distance from tenant shop — informational only; drives the future
     // geofence/zone work. No enforcement yet.
@@ -117,7 +111,7 @@ export const handleDeliveryLocation = async (
 
     await whatsappMessager.sendFreeFormTextMessage(
       from,
-      // eslint-disable-next-line max-len
+
       `Got it! We've saved your delivery location for order ${orderNumber}.\n\nWrong location? Just send a new pin to update it.`,
     );
 
@@ -135,11 +129,13 @@ export const handleDeliveryLocation = async (
       logger.error(`${TAG} Failed to reset location state for ${from}: ${stateError}`);
     });
 
-    await whatsappMessager.sendFreeFormTextMessage(
-      from,
-      'Sorry, we had trouble saving your location. Please send your pin again.',
-    ).catch((sendError) => {
-      logger.error(`${TAG} Failed to notify ${from} of location error: ${sendError}`);
-    });
+    await whatsappMessager
+      .sendFreeFormTextMessage(
+        from,
+        'Sorry, we had trouble saving your location. Please send your pin again.',
+      )
+      .catch((sendError) => {
+        logger.error(`${TAG} Failed to notify ${from} of location error: ${sendError}`);
+      });
   }
 };

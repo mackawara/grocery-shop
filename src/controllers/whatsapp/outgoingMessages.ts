@@ -3,12 +3,16 @@ import { logger } from '../../services/logger';
 import { CONFIG } from '../../config';
 import constants from '../../constants';
 import UTILS from '../../utils';
-import type { Interactive , InteractiveFlow, InteractiveList, InteractiveActionSection, ReplyButtonObject} from '../../types/types';
+import type {
+  Interactive,
+  InteractiveFlow,
+  InteractiveList,
+  InteractiveActionSection,
+  ReplyButtonObject,
+} from '../../types/types';
 import { isEmpty } from 'lodash';
 
-
 import { saveWhatsappMessage } from '../../utils/whatsapp.utils';
-
 
 const whatsappApiVersion = 'v21.0';
 
@@ -26,7 +30,6 @@ const sendFreeFormTextMessage = async (
   text: string,
 ): Promise<MessageResult> => {
   try {
-
     const response = await axios({
       method: 'POST',
       url: messagesEndpointUrl,
@@ -55,8 +58,7 @@ const sendFreeFormTextMessage = async (
     });
 
     return { success: true };
-
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (UTILS.isFacebookAPIError(err)) {
       const errorMessage = err.response?.data?.error?.message || 'Unknown Facebook API Error';
       logger.error(errorMessage);
@@ -71,10 +73,12 @@ const sendFreeFormTextMessage = async (
       status: 'failed',
     });
 
-    return { success: false, error: err.message };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 };
-
 
 const sendInteractive = async (
   receivingNumber: string,
@@ -94,7 +98,10 @@ const sendInteractive = async (
     });
 
     if (!result || result.status !== 200) {
-      return { success: false, error: `Failed to send interactive message. Status code: ${result?.status}` };
+      return {
+        success: false,
+        error: `Failed to send interactive message. Status code: ${result?.status}`,
+      };
     }
 
     logger.info(`${TAG}: message sent to ${receivingNumber}, status: ${result.statusText}`);
@@ -111,8 +118,7 @@ const sendInteractive = async (
     });
 
     return { success: true };
-
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (UTILS.isFacebookAPIError(err)) {
       const { message, fbtrace_id, error_data } = err.response.data.error;
       logger.error(`${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`);
@@ -128,7 +134,10 @@ const sendInteractive = async (
       status: 'failed',
     });
 
-    return { success: false, error: err.message };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 };
 
@@ -152,11 +161,6 @@ export function createFlowInteractive(params: {
     headerText,
     footerText,
   } = params;
-  const flowActionPayload = {
-    screen: initialScreen,
-    data:
-      isEmpty(initialData) || initialData === undefined ? null : initialData,
-  };
   const interactive: InteractiveFlow = {
     type: 'flow',
     //sub_type: "interactive",
@@ -197,7 +201,6 @@ export function createFlowInteractive(params: {
 
   return interactive;
 }
-
 
 interface SendWhatsAppCatalogMessage {
   name: 'catalog_message';
@@ -288,7 +291,7 @@ export async function sendWhatsAppCatalogMessage({
     });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error sending WhatsApp catalog_message:', error);
 
     await saveWhatsappMessage({
@@ -346,12 +349,10 @@ const sendLocationRequestMessage = async (
     });
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (UTILS.isFacebookAPIError(err)) {
       const { message, fbtrace_id, error_data } = err.response.data.error;
-      logger.error(
-        `${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`,
-      );
+      logger.error(`${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`);
     }
 
     await saveWhatsappMessage({
@@ -364,7 +365,10 @@ const sendLocationRequestMessage = async (
       status: 'failed',
     });
 
-    return { success: false, error: err.message };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 };
 

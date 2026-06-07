@@ -15,12 +15,7 @@ import { CONFIG } from '../config';
 import { logger } from '../services/logger';
 import { connectDb } from '../services/database';
 import Tenant from '../models/Tenant';
-import {
-  TenantStatus,
-  TenantPlan,
-  PaymentMethod,
-  DeliveryMethod,
-} from '../constants/models';
+import { TenantStatus, TenantPlan, PaymentMethod, DeliveryMethod } from '../constants/models';
 import { DEFAULT_ORDER_FLOW_ID } from '../constants/orderFlow';
 import { runWithoutTenant } from '../context/tenantContext';
 
@@ -58,8 +53,7 @@ const run = async (): Promise<void> => {
   // Always give the local tenant an order flow id so the order handler can pull
   // it from the tenant; env overrides the shared default.
   const orderFlowId =
-    process.env.LOCAL_TENANT_WHATSAPP_ORDER_FLOW_ID?.trim() ||
-    DEFAULT_ORDER_FLOW_ID;
+    process.env.LOCAL_TENANT_WHATSAPP_ORDER_FLOW_ID?.trim() || DEFAULT_ORDER_FLOW_ID;
 
   // Paynow credentials are optional for seeding — only set them if all three
   // are present so a partially configured tenant can't reach the gateway with a
@@ -139,9 +133,7 @@ const run = async (): Promise<void> => {
       },
     );
   } catch (error) {
-    logger.error(
-      `[${TAG}] Seed failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger.error(`[${TAG}] Seed failed: ${error instanceof Error ? error.message : String(error)}`);
     await mongoose.disconnect();
     process.exit(1);
   }

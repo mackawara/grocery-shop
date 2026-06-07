@@ -1,8 +1,4 @@
-import type {
-  PaymentMethod,
-  PaymentProvider,
-  PaymentStatus,
-} from '../../../constants/models';
+import type { PaymentMethod, PaymentProvider, PaymentStatus } from '../../../constants/models';
 import type { IPaymentCredentials } from '../../../models/Tenant';
 
 // Adapters are pure gateway clients — they never touch the DB, Redis, or env;

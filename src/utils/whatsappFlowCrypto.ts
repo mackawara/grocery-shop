@@ -14,7 +14,9 @@ export interface DecryptedFlowRequest<T = unknown> {
 }
 
 export class FlowKeyMismatchError extends Error {
-  constructor(message = 'Flow private key does not match the public key registered on the WhatsApp account') {
+  constructor(
+    message = 'Flow private key does not match the public key registered on the WhatsApp account',
+  ) {
     super(message);
     this.name = 'FlowKeyMismatchError';
   }
@@ -61,11 +63,7 @@ export const decryptFlowRequest = <T = unknown>(
   const encrypted = flowDataBuffer.subarray(0, flowDataBuffer.length - TAG_LENGTH);
   const authTag = flowDataBuffer.subarray(flowDataBuffer.length - TAG_LENGTH);
 
-  const decipher = crypto.createDecipheriv(
-    'aes-128-gcm',
-    aesKeyBuffer,
-    initialVectorBuffer,
-  );
+  const decipher = crypto.createDecipheriv('aes-128-gcm', aesKeyBuffer, initialVectorBuffer);
   decipher.setAuthTag(authTag);
 
   const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);

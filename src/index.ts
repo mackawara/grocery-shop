@@ -1,9 +1,8 @@
-import {startServer} from './server';
+import { startServer } from './server';
 import { logger } from './services/logger';
 import { RedisService } from './services/redis';
 import { CONFIG } from './config';
 import { connectDb } from './services/database';
-
 
 Promise.race([
   RedisService.getInstance().connect(),
@@ -13,7 +12,7 @@ Promise.race([
     }, CONFIG.REDIS_CONNECT_TIMEOUT);
   }),
 ])
-.then(async () => {
+  .then(async () => {
     startServer();
     await connectDb();
   })

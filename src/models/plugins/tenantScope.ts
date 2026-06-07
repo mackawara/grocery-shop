@@ -1,15 +1,6 @@
-import type {
-  Aggregate,
-  HydratedDocument,
-  MongooseQueryMiddleware,
-  Query,
-  Schema,
-} from 'mongoose';
+import type { Aggregate, HydratedDocument, MongooseQueryMiddleware, Query, Schema } from 'mongoose';
 import { Types } from 'mongoose';
-import {
-  isBypassing,
-  requireTenantId,
-} from '../../context/tenantContext';
+import { isBypassing, requireTenantId } from '../../context/tenantContext';
 
 const QUERY_HOOKS: MongooseQueryMiddleware[] = [
   'countDocuments',
@@ -39,10 +30,7 @@ const UPDATE_HOOKS = new Set<MongooseQueryMiddleware>([
   'updateMany',
   'findOneAndUpdate',
 ]);
-const REPLACE_HOOKS = new Set<MongooseQueryMiddleware>([
-  'replaceOne',
-  'findOneAndReplace',
-]);
+const REPLACE_HOOKS = new Set<MongooseQueryMiddleware>(['replaceOne', 'findOneAndReplace']);
 
 const toObjectId = (id: string) => new Types.ObjectId(id);
 
@@ -59,11 +47,7 @@ const CROSS_COLLECTION_STAGES = [
   '$out',
 ] as const;
 
-const assertTenantMatch = (
-  value: unknown,
-  tenantId: string,
-  where: string,
-): void => {
+const assertTenantMatch = (value: unknown, tenantId: string, where: string): void => {
   if (value != null && String(value) !== tenantId) {
     throw new Error(
       `tenantScope: ${where} sets tenantId ${String(value)} but context is ${tenantId}`,
@@ -86,9 +70,7 @@ const scopeUpdate = (query: QueryThis, tenantId: string): void => {
   }
   const updateDoc = update as Record<string, unknown>;
   const setOp = updateDoc.$set as Record<string, unknown> | undefined;
-  const setOnInsertOp = updateDoc.$setOnInsert as
-    | Record<string, unknown>
-    | undefined;
+  const setOnInsertOp = updateDoc.$setOnInsert as Record<string, unknown> | undefined;
   const unsetOp = updateDoc.$unset as Record<string, unknown> | undefined;
 
   // $unset would clear tenantId, orphaning the doc: it stops matching any
@@ -106,11 +88,15 @@ const scopeUpdate = (query: QueryThis, tenantId: string): void => {
   delete updateDoc.tenantId;
   if (setOp) {
     delete setOp.tenantId;
-    if (Object.keys(setOp).length === 0) {delete updateDoc.$set;}
+    if (Object.keys(setOp).length === 0) {
+      delete updateDoc.$set;
+    }
   }
   if (setOnInsertOp) {
     delete setOnInsertOp.tenantId;
-    if (Object.keys(setOnInsertOp).length === 0) {delete updateDoc.$setOnInsert;}
+    if (Object.keys(setOnInsertOp).length === 0) {
+      delete updateDoc.$setOnInsert;
+    }
   }
   query.setUpdate(updateDoc);
 };
@@ -135,9 +121,7 @@ export function tenantScope(schema: Schema): void {
   // the field exists so a model that applies the plugin but forgets to declare
   // tenantId fails at boot rather than silently skipping tenant isolation.
   if (!schema.path('tenantId')) {
-    throw new Error(
-      'tenantScope requires a `tenantId` ObjectId path on the schema',
-    );
+    throw new Error('tenantScope requires a `tenantId` ObjectId path on the schema');
   }
 
   for (const hook of QUERY_HOOKS) {
@@ -225,10 +209,7 @@ export function tenantScope(schema: Schema): void {
     }
   });
 
-  schema.pre('insertMany', function (
-    this: unknown,
-    docs: InsertManyDoc | InsertManyDoc[],
-  ) {
+  schema.pre('insertMany', function (this: unknown, docs: InsertManyDoc | InsertManyDoc[]) {
     if (isBypassing()) {
       return;
     }

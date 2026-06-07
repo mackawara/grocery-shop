@@ -24,7 +24,12 @@ declare module 'paynow' {
   }
 
   export class Paynow {
-    constructor(integrationId: string, integrationKey: string, resultUrl?: string, returnUrl?: string);
+    constructor(
+      integrationId: string,
+      integrationKey: string,
+      resultUrl?: string,
+      returnUrl?: string,
+    );
     resultUrl: string;
     returnUrl: string;
     createPayment(reference: string, authEmail?: string): Payment;

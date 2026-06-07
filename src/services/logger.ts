@@ -6,21 +6,11 @@ import { createLogger, transports, format as winstonFormat } from 'winston';
 const { colorize, combine, simple } = winstonFormat;
 
 type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' | 'silly';
-const LEVELS: LogLevel[] = [
-  'error',
-  'warn',
-  'info',
-  'verbose',
-  'debug',
-  'silly',
-];
+const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'verbose', 'debug', 'silly'];
 const LEVEL: LogLevel = 'debug';
 
 const winstonLogger = createLogger({
-  format: combine(
-    colorize(),
-    simple(),
-  ),
+  format: combine(colorize(), simple()),
   transports: [
     new transports.Console({
       level: process.env.NODE_ENV === 'production' ? LEVEL : 'silly',
@@ -45,7 +35,7 @@ function tenantPrefix(): string {
 
 const writeLogType = (logLevel: LogLevel, writeSync = false) =>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   function (...theArguments: any[]) {
+  function (...theArguments: any[]) {
     const args = Array.from(theArguments);
 
     const loggerMessage = args
@@ -68,17 +58,12 @@ const writeLogType = (logLevel: LogLevel, writeSync = false) =>
 
     winstonLogger[logLevel](prefix + util.format(...args));
 
-    if (
-      process.env.NODE_ENV === 'production' ||
-      process.env.NODE_ENV === 'staging'
-    ) {
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
       if (LEVELS.indexOf(logLevel) >= LEVELS.indexOf(LEVEL)) {
         return;
       }
     }
-  }
-;
-
+  };
 export const logger = {
   silly: writeLogType('silly'),
   debug: writeLogType('debug'),

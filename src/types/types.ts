@@ -26,18 +26,15 @@ export interface BaseMessageNotificationPayload {
   id: string;
   timestamp: string;
 }
-export interface InteractiveMessageNotification
-  extends BaseMessageNotificationPayload {
+export interface InteractiveMessageNotification extends BaseMessageNotificationPayload {
   type: 'interactive';
   interactive: InteractivePayLoad;
 }
-export interface OrderMessageNotification
-  extends BaseMessageNotificationPayload {
+export interface OrderMessageNotification extends BaseMessageNotificationPayload {
   type: 'order';
   order: Order;
 }
-export interface ReactionMessageNotification
-  extends BaseMessageNotificationPayload {
+export interface ReactionMessageNotification extends BaseMessageNotificationPayload {
   type: 'reaction';
   reaction: {
     message_id: string; //"MESSAGE_ID",
@@ -45,8 +42,7 @@ export interface ReactionMessageNotification
   };
 }
 
-export interface LocationMessageNotification
-  extends BaseMessageNotificationPayload {
+export interface LocationMessageNotification extends BaseMessageNotificationPayload {
   type: 'location';
   location: {
     latitude: number;
@@ -105,12 +101,12 @@ export interface Order {
 }
 
 export interface BookingItems {
-   productName: string;
+  productName: string;
   quantity: number;
   priceAtOrder: number;
   productRetailerId: string;
   unitPrice: number;
-  subtotal:number;
+  subtotal: number;
 }
 
 export interface WhatsAppOrderProductItem {
@@ -456,7 +452,6 @@ export interface BaseInteractiveActionObject {
   };
 }
 
-
 export interface InteractiveBaseObject {
   header?: {
     type: 'text' | 'image' | 'document' | 'video';
@@ -580,7 +575,6 @@ export interface PaymentDetails {
   phoneNumber: string;
   method: string;
   orderNumber: string;
-
 }
 
 export type TCreateService = {
@@ -599,7 +593,7 @@ export type TCreateBooking = {
     name: string;
     email: string;
     timeZone: string;
-    phoneNumber: string
+    phoneNumber: string;
   };
   eventTypeId: number;
 };
@@ -612,7 +606,7 @@ export interface ICalcomSlotsResponse {
   };
 }
 
-export interface ServiceResponse<T = any> {
+export interface ServiceResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
