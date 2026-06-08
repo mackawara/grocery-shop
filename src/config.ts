@@ -68,6 +68,8 @@ export const CONFIG = {
   PUBLIC_BASE_URL:
     process.env.PUBLIC_BASE_URL ||
     (isLocal && process.env.NGROK_DOMAIN ? `https://${process.env.NGROK_DOMAIN}` : ''),
+    SHOP_ADDRESS: process.env.SHOP_ADDRESS || '',
+    SHOP_NAME: process.env.SHOP_NAME || '',
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? 'LOCAL' : 'PRODUCTION'} environment`,
