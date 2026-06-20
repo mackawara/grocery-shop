@@ -38,6 +38,33 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review'
+          prompt: |
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+
+            Additional required check — Flow JSON ↔ handler contract.
+
+            WhatsApp Flow JSONs are married to their backend handler by the
+            `flow_token`: it is the identifier that routes a completed flow to the
+            code that processes it (e.g. `ORDER_DETAILS_FLOW_TOKEN` in
+            `src/constants/orderFlow.ts` routes the order flow to `orderFlowHandler`
+            in `src/controllers/whatsapp/orderFlowHandler.ts`). All tenants share the
+            same handler code, so a flow whose payload the handler cannot process
+            breaks that flow at runtime for everyone.
+
+            For every change in this PR to a flow JSON (any `*_FLOW_JSON` definition,
+            e.g. `ORDER_FLOW_JSON`), follow its `flow_token` to the handler and verify
+            the contract still holds:
+              - The flow's `flow_token` maps to exactly one handler (the routing for
+                that token exists).
+              - Every field the flow emits — the `complete` / `data_exchange`
+                `on-click-action` payload keys, plus any screen `data` keys — is
+                consumed by that handler with matching name and type (e.g. the
+                `OrderFlowResponse` contract).
+              - No field the handler reads has been renamed, removed, or retyped
+                without a corresponding update to the handler.
+              - Newly added required fields are actually handled, not silently dropped.
+
+            Treat any flow JSON change that the handler keyed on its `flow_token`
+            cannot fully process as a blocking issue.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
