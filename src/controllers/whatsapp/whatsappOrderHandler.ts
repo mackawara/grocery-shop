@@ -1,16 +1,16 @@
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
-import { logger } from '../../services/logger';
-import type { Order } from '../../types/types';
-import whatsappMessager, { createFlowInteractive } from './outgoingMessages';
-import OrderModel from '../../models/Order';
-import { OrderItem } from '../../models/OrderItem';
-import { setRedisHashKeyValuePair } from '../redis/redis.controller';
-import Tenant from '../../models/Tenant';
-import { getTenantId } from '../../context/tenantContext';
-import { toPaymentMethodOptions, toDeliveryMethodOptions } from '../../constants/models';
-import { DEFAULT_ORDER_FLOW_ID, ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow';
-// import User from "../../models/User"; // TODO: uncomment once User model is fully defined
+import { logger } from '../../services/logger.js';
+import type { Order } from '../../types/types.js';
+import whatsappMessager, { createFlowInteractive } from './outgoingMessages.js';
+import OrderModel from '../../models/Order.js';
+import { OrderItem } from '../../models/OrderItem.js';
+import { setRedisHashKeyValuePair } from '../redis/redis.controller.js';
+import Tenant from '../../models/Tenant.js';
+import { getTenantId } from '../../context/tenantContext.js';
+import { toPaymentMethodOptions, toDeliveryMethodOptions } from '../../constants/models.js';
+import { DEFAULT_ORDER_FLOW_ID, ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow.js';
+// import User from "../../models/User.js"; // TODO: uncomment once User model is fully defined
 
 const ORDER_SESSION_TTL_SECONDS = 1800; // 30 minutes
 

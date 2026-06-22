@@ -1,7 +1,7 @@
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import type { MessageNotification, InteractivePayLoad } from '../types/types';
-import { tenantScope } from './plugins/tenantScope';
+import type { MessageNotification, InteractivePayLoad } from '../types/types.js';
+import { tenantScope } from './plugins/tenantScope.js';
 
 export type WaMessageDirection = 'inbound' | 'outbound';
 export type WaMessageType = MessageNotification['type'];

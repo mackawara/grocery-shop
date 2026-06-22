@@ -15,11 +15,11 @@
 import axios from 'axios';
 import type { Method } from 'axios';
 
-import { CONFIG } from '../config';
-import { getTenantId } from '../context/tenantContext';
-import Tenant from '../models/Tenant';
-import { logger } from '../services/logger';
-import UTILS from './index';
+import { CONFIG } from '../config.js';
+import { getTenantId } from '../context/tenantContext.js';
+import Tenant from '../models/Tenant.js';
+import { logger } from '../services/logger.js';
+import UTILS from './index.js';
 
 const TAG = '[WHATSAPP-FLOWS]';
 

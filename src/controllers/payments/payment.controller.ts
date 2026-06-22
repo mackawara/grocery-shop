@@ -1,23 +1,23 @@
 import mongoose from 'mongoose';
 import type { Types } from 'mongoose';
-import { logger } from '../../services/logger';
-import { CONFIG } from '../../config';
-import OrderModel from '../../models/Order';
-import PaymentModel from '../../models/Payment';
-import Tenant from '../../models/Tenant';
+import { logger } from '../../services/logger.js';
+import { CONFIG } from '../../config.js';
+import OrderModel from '../../models/Order.js';
+import PaymentModel from '../../models/Payment.js';
+import Tenant from '../../models/Tenant.js';
 import {
   PaymentProvider,
   PaymentStatus,
   OrderStatus,
   resolvePaymentProvider,
-} from '../../constants/models';
-import type { PaymentMethod } from '../../constants/models';
-import { getTenantId, runWithTenant, runWithoutTenant } from '../../context/tenantContext';
-import whatsappMessager, { messageComposer } from '../whatsapp/outgoingMessages';
-import { buildPaymentRetryButtonId } from '../../constants/payments';
-import { getProviderAdapter } from './providers/registry';
-import { parsePaynowStatusUpdate } from './gateways/paynowClient';
-import type { InitiatePaymentInput, PaymentProviderContext } from './providers/types';
+} from '../../constants/models.js';
+import type { PaymentMethod } from '../../constants/models.js';
+import { getTenantId, runWithTenant, runWithoutTenant } from '../../context/tenantContext.js';
+import whatsappMessager, { messageComposer } from '../whatsapp/outgoingMessages.js';
+import { buildPaymentRetryButtonId } from '../../constants/payments.js';
+import { getProviderAdapter } from './providers/registry.js';
+import { parsePaynowStatusUpdate } from './gateways/paynowClient.js';
+import type { InitiatePaymentInput, PaymentProviderContext } from './providers/types.js';
 
 const TAG = '[PAYMENT]';
 

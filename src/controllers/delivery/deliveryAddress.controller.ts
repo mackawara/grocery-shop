@@ -1,8 +1,8 @@
 import type { Types } from 'mongoose';
-import { logger } from '../../services/logger';
-import UserModel from '../../models/User';
-import type { IUser } from '../../models/User';
-import DeliveryAddressModel from '../../models/DeliveryAddress';
+import { logger } from '../../services/logger.js';
+import UserModel from '../../models/User.js';
+import type { IUser } from '../../models/User.js';
+import DeliveryAddressModel from '../../models/DeliveryAddress.js';
 
 const TAG = '[DELIVERY_ADDRESS]';
 

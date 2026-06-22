@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import { CONFIG } from '../config';
-import { logger } from './logger';
+import { CONFIG } from '../config.js';
+import { logger } from './logger.js';
 
 // eslint-disable-next-line consistent-return -- catch calls process.exit(1) (never returns)
 export const connectDb = async () => {

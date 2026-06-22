@@ -18,12 +18,12 @@ import {
   PaymentMethod as PaymentMethodEnum,
   toPaymentMethodOptions,
   toDeliveryMethodOptions,
-} from './models';
+} from './models.js';
 
 // Fallback Meta flow id for the order-details flow. Tenants carry their own id
 // in `whatsappFlowIds.order`; this is only used when that is unset (e.g. local
 // dev before the env var is configured).
-export const DEFAULT_ORDER_FLOW_ID = '1310221120578634';
+export const DEFAULT_ORDER_FLOW_ID = '1310221120578634'; // TODO DO AAWAY WITH THIS HARDCODED VALUE
 
 // flow_token sent with the order-details flow and echoed back by Meta inside
 // `nfm_reply.response_json` on completion. The nfm-reply handler switches on

@@ -1,6 +1,6 @@
 import type { Aggregate, HydratedDocument, MongooseQueryMiddleware, Query, Schema } from 'mongoose';
 import { Types } from 'mongoose';
-import { isBypassing, requireTenantId } from '../../context/tenantContext';
+import { isBypassing, requireTenantId } from '../../context/tenantContext.js';
 
 const QUERY_HOOKS: MongooseQueryMiddleware[] = [
   'countDocuments',

@@ -1,8 +1,8 @@
 import type { RedisClientType } from 'redis';
 import { createClient } from 'redis';
 
-import { CONFIG } from '../config';
-import { logger } from './logger';
+import { CONFIG } from '../config.js';
+import { logger } from './logger.js';
 
 const TAG = 'REDIS';
 

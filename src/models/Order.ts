@@ -1,8 +1,8 @@
 // TODO: Stub model — extend with delivery address, discount, and channel fields before production use
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import { OrderStatus, PaymentStatus, DeliveryStatus } from '../constants/models';
-import { tenantScope } from './plugins/tenantScope';
+import { OrderStatus, PaymentStatus, DeliveryStatus } from '../constants/models.js';
+import { tenantScope } from './plugins/tenantScope.js';
 
 export { OrderStatus, PaymentStatus, DeliveryStatus };
 

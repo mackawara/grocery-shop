@@ -1,7 +1,8 @@
 {
   "name": "grocery-shop-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "dist/index.js",
   "repository": "https://github.com/mackawara/grocery-shop.git",
   "author": "venta_tech",
   "license": "MIT",
@@ -12,8 +13,8 @@
     "format:check": "prettier --check .",
     "start": "node dist/index.js",
     "build": "tsc",
-    "dev": "nodemon  --exec ./node_modules/.bin/ts-node --files ./src/index.ts",
-    "seed:local": "./node_modules/.bin/ts-node --files ./src/scripts/seedLocalTenant.ts",
+    "dev": "nodemon --exec tsx ./src/index.ts",
+    "seed:local": "tsx ./src/scripts/seedLocalTenant.ts",
     "ngrok": "ngrok http --domain=relaxed-bee-active.ngrok-free.app 3000",
     "prepare": "husky"
   },
@@ -21,14 +22,17 @@
     "@types/cors": "^2.8.19",
     "@types/morgan": "^1.9.10",
     "axios": "^1.16.0",
+    "connect-redis": "^9.0.0",
     "cors": "^2.8.6",
     "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "helmet": "^8.1.0",
     "lodash": "^4.18.1",
     "mongoose": "^9.6.2",
     "morgan": "^1.10.1",
+    "openid-client": "^6",
     "paynow": "^2.2.2",
     "redis": "^5.12.1",
     "typescript": "^6.0.3",
@@ -37,6 +41,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
     "@types/lodash": "^4.17.24",
     "@types/node": "^25.6.0",
     "@types/redis": "^4.0.11",
@@ -47,7 +52,7 @@
     "jiti": "^2.7.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.8.3",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
     "typescript-eslint": "^8.59.2"
   }
 }
