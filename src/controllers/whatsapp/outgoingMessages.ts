@@ -1,18 +1,18 @@
 import axios from 'axios';
-import { logger } from '../../services/logger';
-import { CONFIG } from '../../config';
-import constants from '../../constants';
-import UTILS from '../../utils';
+import { logger } from '../../services/logger.js';
+import { CONFIG } from '../../config.js';
+import constants from '../../constants/index.js';
+import UTILS from '../../utils/index.js';
 import type {
   Interactive,
   InteractiveFlow,
   InteractiveList,
   InteractiveActionSection,
   ReplyButtonObject,
-} from '../../types/types';
-import { isEmpty } from 'lodash';
+} from '../../types/types.js';
+import isEmpty from 'lodash/isEmpty.js';
 
-import { saveWhatsappMessage } from '../../utils/whatsapp.utils';
+import { saveWhatsappMessage } from '../../utils/whatsapp.utils.js';
 
 const whatsappApiVersion = 'v21.0';
 

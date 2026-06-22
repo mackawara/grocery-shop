@@ -1,6 +1,6 @@
 import type { Document } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import { tenantScope } from './plugins/tenantScope';
+import { tenantScope } from './plugins/tenantScope.js';
 
 export interface IDeliveryAddress extends Document {
   tenantId: mongoose.Types.ObjectId;

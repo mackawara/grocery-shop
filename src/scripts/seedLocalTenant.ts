@@ -11,13 +11,13 @@
  * Usage:  yarn seed:local
  */
 import mongoose from 'mongoose';
-import { CONFIG } from '../config';
-import { logger } from '../services/logger';
-import { connectDb } from '../services/database';
-import Tenant from '../models/Tenant';
-import { TenantStatus, TenantPlan, PaymentMethod, DeliveryMethod } from '../constants/models';
-import { DEFAULT_ORDER_FLOW_ID } from '../constants/orderFlow';
-import { runWithoutTenant } from '../context/tenantContext';
+import { CONFIG } from '../config.js';
+import { logger } from '../services/logger.js';
+import { connectDb } from '../services/database.js';
+import Tenant from '../models/Tenant.js';
+import { TenantStatus, TenantPlan, PaymentMethod, DeliveryMethod } from '../constants/models.js';
+import { DEFAULT_ORDER_FLOW_ID } from '../constants/orderFlow.js';
+import { runWithoutTenant } from '../context/tenantContext.js';
 
 const TAG = 'SEED_LOCAL_TENANT';
 

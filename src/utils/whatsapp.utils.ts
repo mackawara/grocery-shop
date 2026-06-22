@@ -1,11 +1,11 @@
-import { logger } from '../services/logger';
+import { logger } from '../services/logger.js';
 import type {
   WaMessageDirection,
   WaMessageType,
   WaInteractiveType,
   WaMessageStatus,
-} from '../models/whatsappMessage.model';
-import WhatsappMessage from '../models/whatsappMessage.model';
+} from '../models/whatsappMessage.model.js';
+import WhatsappMessage from '../models/whatsappMessage.model.js';
 
 const TAG = '[WHATSAPP_UTILS]';
 

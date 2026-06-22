@@ -1,4 +1,4 @@
-import { requireTenantId } from '../context/tenantContext';
+import { requireTenantId } from '../context/tenantContext.js';
 
 const TENANT_PREFIX = 't';
 const GLOBAL_PREFIX = 'global';

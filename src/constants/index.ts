@@ -1,6 +1,6 @@
-import * as whatsapp from './whatsapp';
-import * as models from './models';
-import * as orderFlow from './orderFlow';
+import * as whatsapp from './whatsapp.js';
+import * as models from './models.js';
+import * as orderFlow from './orderFlow.js';
 
 const constants = {
   whatsapp,
@@ -8,5 +8,5 @@ const constants = {
   orderFlow,
 };
 
-export * from './orderFlow';
+export * from './orderFlow.js';
 export default constants;

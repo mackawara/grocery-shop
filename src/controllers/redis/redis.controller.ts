@@ -1,6 +1,6 @@
-import { redisClient } from '../../services/redis';
-import { logger } from '../../services/logger';
-import { tenantKey } from '../../utils/tenantKey';
+import { redisClient } from '../../services/redis.js';
+import { logger } from '../../services/logger.js';
+import { tenantKey } from '../../utils/tenantKey.js';
 
 const TAG = 'REDIS_CONTROLLER';
 const DEFAULT_EXPIRY = 180;

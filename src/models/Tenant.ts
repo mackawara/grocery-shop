@@ -6,7 +6,7 @@ import {
   PaymentMethod,
   PaymentProvider,
   DeliveryMethod,
-} from '../constants/models';
+} from '../constants/models.js';
 
 export interface IWhatsappFlowIds {
   order?: string;
