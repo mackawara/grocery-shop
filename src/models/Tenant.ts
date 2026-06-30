@@ -63,6 +63,10 @@ export interface ITenant extends Document {
   whatsappPhoneNumberId: string;
   whatsappCatalogId?: string;
   whatsappBusinessId: string;
+  // Authentik group pk for this tenant, captured at signup. The group is the
+  // tenant's identity boundary in Authentik; staff invitations are placed into
+  // it so they resolve back to this tenant on login.
+  authGroupPk?: string;
   whatsappFlowIds: IWhatsappFlowIds;
   paymentMethods: PaymentMethod[];
   deliveryMethods: DeliveryMethod[];
@@ -159,6 +163,8 @@ const TenantSchema = new Schema<ITenant>(
     whatsappPhoneNumberId: { type: String, required: true, unique: true },
     whatsappCatalogId: { type: String },
     whatsappBusinessId: { type: String, required: true },
+    // Authentik group pk, stamped at signup; targets staff invitations.
+    authGroupPk: { type: String },
     whatsappFlowIds: { type: WhatsappFlowIdsSchema, default: () => ({}) },
     paymentMethods: {
       type: [String],

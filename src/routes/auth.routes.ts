@@ -1,7 +1,6 @@
 import { Router } from 'express';
 
-import { callback, login, logout, me } from '../controllers/auth/auth.controller.js';
-import { requireAuth } from '../controllers/middleware/requireAuth.js';
+import { callback, login, logout, me } from '../controllers/auth/auth.controller.ts';
 
 const router = Router();
 
@@ -9,8 +8,8 @@ const router = Router();
 router.get('/login', login);
 router.get('/callback', callback);
 
-// Authenticated — current session.
+// Session status + logout.
+router.get('/me', me);
 router.post('/logout', logout);
-router.get('/me', requireAuth, me);
 
 export default router;

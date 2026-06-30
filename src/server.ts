@@ -8,6 +8,9 @@ import { redisClient } from './services/redis.js';
 import whatsappRoutes from './routes/whatsapp.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
+import adminRoutes from './routes/admin.routes.js';
+import { csrfGuard } from './controllers/middleware/csrf.js';
 import cors from 'cors';
 import helmet from 'helmet';
 
@@ -41,9 +44,14 @@ app.use(
 );
 
 //routes
-app.use('/auth', authRoutes);
+// Browser-facing, cookie-session routes get csrfGuard (Origin/Referer check as a
+// second layer behind SameSite=Lax). The WhatsApp/Paynow webhooks are
+// server-to-server and legitimately send no Origin, so they must NOT be guarded.
+app.use('/auth', csrfGuard, authRoutes);
 app.use('/whatsapp', whatsappRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/dashboard', csrfGuard, dashboardRoutes);
+app.use('/admin', csrfGuard, adminRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({

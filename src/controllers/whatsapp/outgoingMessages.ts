@@ -9,6 +9,7 @@ import type {
   InteractiveList,
   InteractiveActionSection,
   ReplyButtonObject,
+  TemplateComponentsPostBody,
 } from '../../types/types.js';
 import isEmpty from 'lodash/isEmpty.js';
 
@@ -372,12 +373,90 @@ const sendLocationRequestMessage = async (
   }
 };
 
+export interface SendTemplateParams {
+  to: string;
+  // Registered template name in the WABA (e.g. the vendor auth OTP template).
+  name: string;
+  // Must match the template's configured language (see WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG).
+  languageCode: string;
+  components?: TemplateComponentsPostBody[];
+}
+
+// Send a pre-approved WhatsApp message template. Templates are the only way to
+// initiate a conversation outside the 24h customer-care window (used here to
+// deliver vendor signup OTPs). Mirrors the other senders: returns a MessageResult
+// and records the attempt via saveWhatsappMessage.
+const sendTemplate = async ({
+  to,
+  name,
+  languageCode,
+  components,
+}: SendTemplateParams): Promise<MessageResult> => {
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: messagesEndpointUrl,
+      headers,
+      data: {
+        messaging_product: constants.whatsapp.WHATSAPP,
+        recipient_type: constants.whatsapp.INDIVIDUAL,
+        to,
+        type: constants.whatsapp.WA_MESSAGE_TYPE.TEMPLATE,
+        template: {
+          name,
+          language: { code: languageCode },
+          ...(components ? { components } : {}),
+        },
+      },
+    });
+
+    if (!response || response.status !== 200) {
+      return {
+        success: false,
+        error: `Failed to send template. Status code: ${response?.status}`,
+      };
+    }
+
+    await saveWhatsappMessage({
+      phoneNumber: to,
+      direction: 'outbound',
+      messageType: constants.whatsapp.WA_MESSAGE_TYPE.TEMPLATE,
+      content: name,
+      externalId: response.data?.messages?.[0]?.id,
+      timestamp: new Date(),
+      status: 'sent',
+    });
+
+    return { success: true };
+  } catch (err: unknown) {
+    if (UTILS.isFacebookAPIError(err)) {
+      const { message, fbtrace_id, error_data } = err.response.data.error;
+      logger.error(`${TAG}: ${message}, ${error_data?.details} Facebook traceID : ${fbtrace_id}`);
+    }
+
+    await saveWhatsappMessage({
+      phoneNumber: to,
+      direction: 'outbound',
+      messageType: constants.whatsapp.WA_MESSAGE_TYPE.TEMPLATE,
+      content: name,
+      timestamp: new Date(),
+      status: 'failed',
+    });
+
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+};
+
 const whatsappMessager = {
   sendFreeFormTextMessage,
   sendInteractive,
   sendLocationRequestMessage,
   createFlowInteractive,
   sendWhatsAppCatalogMessage,
+  sendTemplate,
 };
 
 interface ReplyList {
