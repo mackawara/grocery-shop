@@ -1,12 +1,11 @@
 import mongoose from 'mongoose';
-import { CONFIG } from '../config.js';
-import { logger } from './logger.js';
+import { CONFIG } from '../config.ts';
+import { logger } from './logger.ts';
 
 // eslint-disable-next-line consistent-return -- catch calls process.exit(1) (never returns)
 export const connectDb = async () => {
   try {
     const mongoString = 'mongodb+srv://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_HOST}';
-
     const connectionString = `mongodb+srv://${CONFIG.MONGODB_USERNAME}:${CONFIG.MONGODB_PASSWORD}@${CONFIG.MONGODB_HOST}`;
     logger.info(`[MONGOOSE]: Connecting: ${mongoString} `);
 

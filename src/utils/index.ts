@@ -1,4 +1,4 @@
-import type { FacebookAPIError } from '../types/types.js';
+import type { FacebookAPIError } from '../types/types.ts';
 
 const isFacebookAPIError = (error: unknown): error is FacebookAPIError =>
   typeof error === 'object' &&

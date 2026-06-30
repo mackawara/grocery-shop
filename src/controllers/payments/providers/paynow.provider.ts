@@ -1,12 +1,12 @@
-import { PaymentMethod, PaymentProvider, PaymentStatus } from '../../../constants/models.js';
-import { logger } from '../../../services/logger.js';
-import { initiateMobilePayment } from '../gateways/paynowClient.js';
+import { PaymentMethod, PaymentProvider, PaymentStatus } from '../../../constants/models.ts';
+import { logger } from '../../../services/logger.ts';
+import { initiateMobilePayment } from '../gateways/paynowClient.ts';
 import type {
   InitiatePaymentInput,
   InitiatePaymentResult,
   PaymentProviderAdapter,
   PaymentProviderContext,
-} from './types.js';
+} from './types.ts';
 
 const TAG = '[PAYNOW_PROVIDER]';
 

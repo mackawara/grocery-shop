@@ -1,5 +1,5 @@
-import type { PaymentMethod, PaymentProvider, PaymentStatus } from '../../../constants/models.js';
-import type { IPaymentCredentials } from '../../../models/Tenant.js';
+import type { PaymentMethod, PaymentProvider, PaymentStatus } from '../../../constants/models.ts';
+import type { IPaymentCredentials } from '../../../models/Tenant.ts';
 
 // Adapters are pure gateway clients — they never touch the DB, Redis, or env;
 // the orchestrator assembles everything they need.

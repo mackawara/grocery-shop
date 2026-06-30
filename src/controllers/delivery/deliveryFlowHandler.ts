@@ -1,12 +1,12 @@
-import { logger } from '../../services/logger.js';
-import whatsappMessager from '../whatsapp/outgoingMessages.js';
-import OrderModel from '../../models/Order.js';
-import DeliveryAddressModel from '../../models/DeliveryAddress.js';
-import Tenant from '../../models/Tenant.js';
-import { getTenantId } from '../../context/tenantContext.js';
-import { getRedisHashValue, setRedisHashKeyValuePair } from '../redis/redis.controller.js';
-import { haversineKm } from '../../utils/geo.js';
-import { initiateOrderPayment } from '../payments/payment.controller.js';
+import { logger } from '../../services/logger.ts';
+import whatsappMessager from '../whatsapp/outgoingMessages.ts';
+import OrderModel from '../../models/Order.ts';
+import DeliveryAddressModel from '../../models/DeliveryAddress.ts';
+import Tenant from '../../models/Tenant.ts';
+import { getTenantId } from '../../context/tenantContext.ts';
+import { getRedisHashValue, setRedisHashKeyValuePair } from '../redis/redis.controller.ts';
+import { haversineKm } from '../../utils/geo.ts';
+import { initiateOrderPayment } from '../payments/payment.controller.ts';
 
 const TAG = '[DELIVERY_FLOW]';
 
@@ -20,7 +20,8 @@ export const ADDRESS_STATE = {
 
 /**
  * Send the location_request_message asking the customer to drop a GPS pin.
- * Called by orderFlowHandler once the DeliveryAddress (typed fields) is saved.
+ * Called by orderFlowHandler once the DeliveryAddress
+ *  (typed fields) is saved.
  */
 export const promptForLocation = async (from: string): Promise<void> => {
   try {

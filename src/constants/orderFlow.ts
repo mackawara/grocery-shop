@@ -18,7 +18,7 @@ import {
   PaymentMethod as PaymentMethodEnum,
   toPaymentMethodOptions,
   toDeliveryMethodOptions,
-} from './models.js';
+} from './models.ts';
 
 // Fallback Meta flow id for the order-details flow. Tenants carry their own id
 // in `whatsappFlowIds.order`; this is only used when that is unset (e.g. local

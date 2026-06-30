@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { logger } from '../../services/logger.js';
+import { logger } from '../../services/logger.ts';
 import type {
   WebhookNotificationBody,
   Text,
@@ -7,7 +7,7 @@ import type {
   OrderMessageNotification,
   ReactionMessageNotification,
   LocationMessageNotification,
-} from '../../types/types.js';
+} from '../../types/types.ts';
 
 import {
   textHandler,
@@ -15,10 +15,10 @@ import {
   reactionHandler,
   locationHandler,
   isWhatsAppMessageProcessed,
-} from './conversation.controller.js';
-import { whatsappOrderHandler } from './whatsappOrderHandler.js';
-import { saveWhatsappMessage } from '../../utils/whatsapp.utils.js';
-import type { WaInteractiveType, WaMessageType } from '../../models/whatsappMessage.model.js';
+} from './conversation.controller.ts';
+import { whatsappOrderHandler } from './whatsappOrderHandler.ts';
+import { saveWhatsappMessage } from '../../utils/whatsapp.utils.ts';
+import type { WaInteractiveType, WaMessageType } from '../../models/whatsappMessage.model.ts';
 import { fromUnixTime } from 'date-fns';
 
 export const incomingMessagesHandler = async (req: Request, res: Response) => {

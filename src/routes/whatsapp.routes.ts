@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { verifyWebhookToken } from '../controllers/whatsapp/verifyWebhook.js';
-import { incomingMessagesHandler } from '../controllers/whatsapp/incomingMessages.js';
-import { whatsappTenantResolver } from '../controllers/middleware/whatsappTenantResolver.js';
-import { flowsHandler } from '../controllers/whatsapp/flowsHandler.js';
+import { verifyWebhookToken } from '../controllers/whatsapp/verifyWebhook.ts';
+import { incomingMessagesHandler } from '../controllers/whatsapp/incomingMessages.ts';
+import { whatsappTenantResolver } from '../controllers/middleware/whatsappTenantResolver.ts';
+import { flowsHandler } from '../controllers/whatsapp/flowsHandler.ts';
 
 const router = Router();
 
