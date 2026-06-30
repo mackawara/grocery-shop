@@ -1,6 +1,6 @@
 import { Paynow } from 'paynow';
-import { PaymentStatus } from '../../../constants/models.js';
-import { logger } from '../../../services/logger.js';
+import { PaymentStatus } from '../../../constants/models.ts';
+import { logger } from '../../../services/logger.ts';
 
 const TAG = '[PAYNOW_CLIENT]';
 

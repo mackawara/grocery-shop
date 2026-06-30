@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { Types } from 'mongoose';
-import Tenant from '../../models/Tenant.js';
-import { TenantStatus } from '../../constants/models.js';
-import { runWithTenant, runWithoutTenant } from '../../context/tenantContext.js';
-import { logger } from '../../services/logger.js';
-import type { WebhookNotificationBody } from '../../types/types.js';
+import Tenant from '../../models/Tenant.ts';
+import { TenantStatus } from '../../constants/models.ts';
+import { runWithTenant, runWithoutTenant } from '../../context/tenantContext.ts';
+import { logger } from '../../services/logger.ts';
+import type { WebhookNotificationBody } from '../../types/types.ts';
 
 export const whatsappTenantResolver = async (
   req: Request,

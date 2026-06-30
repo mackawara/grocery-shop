@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { CONFIG } from '../../config.js';
+import { CONFIG } from '../../config.ts';
 
 interface payload {
   'hub.mode': string;

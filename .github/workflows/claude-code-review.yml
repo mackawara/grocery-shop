@@ -66,5 +66,31 @@ jobs:
 
             Treat any flow JSON change that the handler keyed on its `flow_token`
             cannot fully process as a blocking issue.
+
+            Additional required check — CSRF guard coverage on browser-facing routes.
+
+            `csrfGuard` (`src/controllers/middleware/csrf.ts`) is the second layer of
+            CSRF defence for the cookie-session, browser-facing dashboard routes. It
+            must be mounted on every route group that authenticates via session cookies
+            and serves the Vendor Dashboard / admin / auth surface, and it must NOT be
+            mounted on the server-to-server webhook routes (`/whatsapp`, `/payments`),
+            which legitimately arrive with no `Origin`/`Referer` and would break under
+            the guard. Today it is mounted in `src/server.ts` on `/auth`, `/dashboard`,
+            and `/admin`.
+
+            For any change in this PR that adds, renames, or re-mounts a route group
+            (an `app.use('/<prefix>', ...)` in `src/server.ts`, or a new `*.routes.ts`),
+            verify:
+              - Every new or changed browser-facing, cookie-session route group is
+                mounted WITH `csrfGuard` in its `app.use(...)` chain (before the router).
+              - `csrfGuard` is NOT added to the WhatsApp or Paynow webhook route groups
+                (`/whatsapp`, `/payments`) — doing so is also a defect.
+              - The guard was not removed or reordered after the route handlers such
+                that state-changing requests reach a handler without passing through it.
+
+            Treat a new browser-facing/cookie-session route group mounted without
+            `csrfGuard`, or `csrfGuard` removed from `/auth`, `/dashboard`, or `/admin`,
+            as a blocking issue. If you cannot tell whether a new route group is
+            browser-facing or server-to-server, flag it and ask rather than assuming.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options

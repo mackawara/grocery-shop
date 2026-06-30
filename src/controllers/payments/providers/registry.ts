@@ -1,6 +1,6 @@
-import { PaymentProvider } from '../../../constants/models.js';
-import { paynowProvider } from './paynow.provider.js';
-import type { PaymentProviderAdapter } from './types.js';
+import { PaymentProvider } from '../../../constants/models.ts';
+import { paynowProvider } from './paynow.provider.ts';
+import type { PaymentProviderAdapter } from './types.ts';
 
 // Gateway → adapter. Standalone EcoCash/OMari get added here once built; cash
 // on delivery has no adapter (settled manually via the orchestrator).

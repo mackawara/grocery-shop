@@ -1,8 +1,8 @@
-import { startServer } from './server.js';
-import { logger } from './services/logger.js';
-import { RedisService } from './services/redis.js';
-import { CONFIG } from './config.js';
-import { connectDb } from './services/database.js';
+import { startServer } from './server.ts';
+import { logger } from './services/logger.ts';
+import { RedisService } from './services/redis.ts';
+import { CONFIG } from './config.ts';
+import { connectDb } from './services/database.ts';
 
 Promise.race([
   RedisService.getInstance().connect(),

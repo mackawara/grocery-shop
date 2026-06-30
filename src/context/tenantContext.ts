@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Types } from 'mongoose';
-import { logger, setTenantLabelProvider } from '../services/logger.js';
+import { logger, setTenantLabelProvider } from '../services/logger.ts';
 
 export interface TenantContext {
   tenantId: string;

@@ -1,13 +1,13 @@
-import { logger } from '../../services/logger.js';
-import { isMessageProcessed } from '../redis/redis.controller.js';
-import { WA_MESSAGE_TTL_SECONDS } from '../../constants/whatsapp.js';
-import { ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow.js';
-import type { OrderFlowResponse } from '../../constants/orderFlow.js';
-import { orderFlowHandler } from './orderFlowHandler.js';
-import { handleDeliveryLocation } from '../delivery/deliveryFlowHandler.js';
-import { initiateOrderPayment } from '../payments/payment.controller.js';
-import { parsePaymentRetryButtonId } from '../../constants/payments.js';
-import whatsappMessager from './outgoingMessages.js';
+import { logger } from '../../services/logger.ts';
+import { isMessageProcessed } from '../redis/redis.controller.ts';
+import { WA_MESSAGE_TTL_SECONDS } from '../../constants/whatsapp.ts';
+import { ORDER_DETAILS_FLOW_TOKEN } from '../../constants/orderFlow.ts';
+import type { OrderFlowResponse } from '../../constants/orderFlow.ts';
+import { orderFlowHandler } from './orderFlowHandler.ts';
+import { handleDeliveryLocation } from '../delivery/deliveryFlowHandler.ts';
+import { initiateOrderPayment } from '../payments/payment.controller.ts';
+import { parsePaymentRetryButtonId } from '../../constants/payments.ts';
+import whatsappMessager from './outgoingMessages.ts';
 import type {
   Text,
   InteractivePayLoad,
@@ -16,7 +16,7 @@ import type {
   InteractiveListReplyNotifications,
   InteractiveNfmReplyNotification,
   LocationMessageNotification,
-} from '../../types/types.js';
+} from '../../types/types.ts';
 
 const WA_MSG_KEY_PREFIX = 'wa:msg:';
 

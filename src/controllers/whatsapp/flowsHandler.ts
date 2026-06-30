@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-import { logger } from '../../services/logger.js';
+import { logger } from '../../services/logger.ts';
 import {
   decryptFlowRequest,
   encryptFlowResponse,
   FlowKeyMismatchError,
   type EncryptedFlowRequest,
-} from '../../utils/whatsappFlowCrypto.js';
+} from '../../utils/whatsappFlowCrypto.ts';
 
 interface FlowDataExchange {
   version: string;

@@ -15,11 +15,11 @@
 import axios from 'axios';
 import type { Method } from 'axios';
 
-import { CONFIG } from '../config.js';
-import { getTenantId } from '../context/tenantContext.js';
-import Tenant from '../models/Tenant.js';
-import { logger } from '../services/logger.js';
-import UTILS from './index.js';
+import { CONFIG } from '../config.ts';
+import { getTenantId } from '../context/tenantContext.ts';
+import Tenant from '../models/Tenant.ts';
+import { logger } from '../services/logger.ts';
+import UTILS from './index.ts';
 
 const TAG = '[WHATSAPP-FLOWS]';
 
@@ -132,15 +132,11 @@ const authHeaders = (): Record<string, string> => ({
 const resolveWabaId = async (): Promise<string> => {
   const tenantId = getTenantId();
   if (!tenantId) {
-    throw new Error(
-      'No tenant context — flow create/list must run inside runWithTenant().',
-    );
+    throw new Error('No tenant context — flow create/list must run inside runWithTenant().');
   }
   const tenant = await Tenant.findById(tenantId).select('whatsappBusinessId').lean();
   if (!tenant?.whatsappBusinessId) {
-    throw new Error(
-      `Tenant ${tenantId} has no whatsappBusinessId (WABA id) configured.`,
-    );
+    throw new Error(`Tenant ${tenantId} has no whatsappBusinessId (WABA id) configured.`);
   }
   return tenant.whatsappBusinessId;
 };
@@ -199,9 +195,7 @@ const request = async <T>(
  * `publish` is requested with invalid Flow JSON).
  * POST /{WABA_ID}/flows
  */
-const createFlow = async (
-  params: CreateFlowParams,
-): Promise<FlowApiResult<CreateFlowResponse>> => {
+const createFlow = async (params: CreateFlowParams): Promise<FlowApiResult<CreateFlowResponse>> => {
   let wabaId: string;
   try {
     wabaId = await resolveWabaId();
@@ -359,9 +353,7 @@ interface FlowAsset {
   download_url: string;
 }
 
-const getFlowAssets = async (
-  flowId: string,
-): Promise<FlowApiResult<{ data: FlowAsset[] }>> =>
+const getFlowAssets = async (flowId: string): Promise<FlowApiResult<{ data: FlowAsset[] }>> =>
   request('GET', `${flowId}/assets`);
 
 /**

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { CONFIG } from '../config.js';
+import { CONFIG } from '../config.ts';
 
 export interface EncryptedFlowRequest {
   encrypted_aes_key: string;

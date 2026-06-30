@@ -1,7 +1,7 @@
 import { Router, text } from 'express';
 import type { Request, Response } from 'express';
-import { isPaynowWebhookAccepted } from '../controllers/payments/payment.controller.js';
-import { logger } from '../services/logger.js';
+import { isPaynowWebhookAccepted } from '../controllers/payments/payment.controller.ts';
+import { logger } from '../services/logger.ts';
 
 const router = Router();
 // TODO Fix the route and make it less broad

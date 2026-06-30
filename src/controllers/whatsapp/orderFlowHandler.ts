@@ -1,19 +1,19 @@
-import { logger } from '../../services/logger.js';
-import whatsappMessager from './outgoingMessages.js';
-import OrderModel from '../../models/Order.js';
-import { getRedisHashValue } from '../redis/redis.controller.js';
+import { logger } from '../../services/logger.ts';
+import whatsappMessager from './outgoingMessages.ts';
+import OrderModel from '../../models/Order.ts';
+import { getRedisHashValue } from '../redis/redis.controller.ts';
 import {
   PaymentMethod,
   DeliveryMethod,
   PaymentStatus,
   DeliveryStatus,
-} from '../../constants/models.js';
-import { sanitizeText, sanitizePhone } from '../../utils/sanitize.js';
-import type { OrderFlowResponse } from '../../constants/orderFlow.js';
-import { promptForLocation } from '../delivery/deliveryFlowHandler.js';
-import { initiateOrderPayment } from '../payments/payment.controller.js';
-import { sendOrderDetailsFlow } from './whatsappOrderHandler.js';
-import { resolveUserByPhone, resolveDeliveryAddress } from '../delivery/deliveryAddress.controller.js';
+} from '../../constants/models.ts';
+import { sanitizeText, sanitizePhone } from '../../utils/sanitize.ts';
+import type { OrderFlowResponse } from '../../constants/orderFlow.ts';
+import { promptForLocation } from '../delivery/deliveryFlowHandler.ts';
+import { initiateOrderPayment } from '../payments/payment.controller.ts';
+import { sendOrderDetailsFlow } from './whatsappOrderHandler.ts';
+import { resolveUserByPhone, resolveDeliveryAddress } from '../delivery/deliveryAddress.controller.ts';
 import type { Types } from 'mongoose';
 
 const isPaymentMethod = (value: unknown): value is PaymentMethod =>
