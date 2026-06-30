@@ -1,8 +1,12 @@
 export enum TenantStatus {
+  // Awaiting platform-admin approval after signup; cannot transact yet.
+  PENDING = 'pending',
   ACTIVE = 'active',
   SUSPENDED = 'suspended',
   TRIAL = 'trial',
   INACTIVE = 'inactive',
+  // Signup declined by a platform admin; terminal.
+  REJECTED = 'rejected',
 }
 
 export enum TenantPlan {
@@ -46,6 +50,28 @@ export enum UserStatus {
   VERIFIED = 'verified',
   DORMANT = 'dormant',
   BLACKLISTED = 'blacklisted',
+}
+
+// Lifecycle of a dashboard-login account (VendorUser). INVITED rows exist before
+// the person has ever authenticated; they flip to ACTIVE on first login (the
+// dashboard auth resolver binds their authSubject). DISABLED locks them out.
+export enum VendorUserStatus {
+  INVITED = 'invited',
+  ACTIVE = 'active',
+  DISABLED = 'disabled',
+}
+
+// Platform operators run the SaaS across tenants. Single role today; kept as an
+// enum so additional operator tiers can be added without touching call sites.
+export enum PlatformRole {
+  SUPER_ADMIN = 'super_admin',
+}
+
+// Lifecycle of a PlatformUser. Mirrors VendorUserStatus minus INVITED — admins
+// are provisioned active via the createPlatformAdmin script.
+export enum PlatformUserStatus {
+  ACTIVE = 'active',
+  DISABLED = 'disabled',
 }
 
 // What the customer picks at checkout — not how it's settled (see PaymentProvider).

@@ -31,6 +31,10 @@ const mandatoryEnvironmentConstants = [
   'AUTHENTIK_ISSUER',
   'AUTHENTIK_CLIENT_ID',
   'AUTHENTIK_CLIENT_SECRET',
+  // Authentik admin API (server-to-server provisioning of groups/users). The
+  // token is a secret and is only ever sent in the Authorization header.
+  'AUTHENTIK_BASE_URL',
+  'AUTHENTIK_ADMIN_TOKEN',
   'SESSION_SECRET',
   'DASHBOARD_URL',
 ];
@@ -79,6 +83,9 @@ export const CONFIG = {
   WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || '',
   WHATSAPP_FLOW_PRIVATE_KEY: process.env.WHATSAPP_FLOW_PRIVATE_KEY || '',
   WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: process.env.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE || '',
+  // Language code of the WhatsApp authentication template used to deliver vendor
+  // signup OTPs (must match the template's configured language). Defaults to en_US.
+  WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG: process.env.WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG || 'en',
   NGROK_DOMAIN: process.env.NGROK_DOMAIN || '',
   PUBLIC_BASE_URL: publicBaseUrl,
   // --- Authentik OIDC / BFF session ---
@@ -87,6 +94,14 @@ export const CONFIG = {
   AUTHENTIK_ISSUER: process.env.AUTHENTIK_ISSUER || '',
   AUTHENTIK_CLIENT_ID: process.env.AUTHENTIK_CLIENT_ID || '',
   AUTHENTIK_CLIENT_SECRET: process.env.AUTHENTIK_CLIENT_SECRET || '',
+  // Base URL of the Authentik admin API host (the /api/v3 path is appended in
+  // the authentik service). e.g. https://auth.ventatech.duckdns.org
+  AUTHENTIK_BASE_URL: process.env.AUTHENTIK_BASE_URL || '',
+  // Bearer token for the admin API. Secret — never log it.
+  AUTHENTIK_ADMIN_TOKEN: process.env.AUTHENTIK_ADMIN_TOKEN || '',
+  // Optional: pk/slug of the Authentik email stage used to send recovery
+  // emails. Required only for sendRecoveryEmail; absence is handled at runtime.
+  AUTHENTIK_RECOVERY_EMAIL_STAGE: process.env.AUTHENTIK_RECOVERY_EMAIL_STAGE || '',
   // Where Authentik sends the user back after login. Defaults to the public
   // base URL + /auth/callback; override only if the callback host differs.
   AUTH_REDIRECT_URI:
@@ -99,6 +114,13 @@ export const CONFIG = {
   // Signs the session cookie; rotate to invalidate all sessions.
   SESSION_SECRET: process.env.SESSION_SECRET || '',
   SESSION_COOKIE_NAME: process.env.SESSION_COOKIE_NAME || 'gs.sid',
+  // Break-glass allowlist: comma-separated emails that are always treated as
+  // active super admins (so an empty PlatformUser collection can't lock everyone
+  // out). Normalized to lowercase; empty/blank entries dropped.
+  PLATFORM_ADMIN_EMAILS: (process.env.PLATFORM_ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
 };
 logger.warn(
   `[${TAG}] Running in ${CONFIG.IS_LOCAL_ENVIRONMENT ? 'LOCAL' : 'PRODUCTION'} environment`,

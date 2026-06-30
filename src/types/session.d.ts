@@ -1,19 +1,11 @@
 import 'express-session';
-import type { SessionUser, OAuthFlowState, SessionTokens } from './auth.js';
+import type { SessionAuth, OAuthFlowState, SessionTokens } from './auth.ts';
 
 declare module 'express-session' {
   interface SessionData {
     oauth?: OAuthFlowState;
-    user?: SessionUser;
+    auth?: SessionAuth;
     tokens?: SessionTokens;
-  }
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: SessionUser;
-    }
   }
 }
 

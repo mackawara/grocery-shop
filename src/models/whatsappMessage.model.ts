@@ -1,20 +1,28 @@
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import type { MessageNotification, InteractivePayLoad } from '../types/types.ts';
 import { tenantScope } from './plugins/tenantScope.ts';
+import {
+  WA_MESSAGE_TYPES,
+  WA_INTERACTIVE_TYPES,
+  WA_MESSAGE_DIRECTIONS,
+  WA_MESSAGE_STATUSES,
+} from '../constants/whatsapp.ts';
 
-export type WaMessageDirection = 'inbound' | 'outbound';
-export type WaMessageType = MessageNotification['type'];
-export type WaInteractiveType =
-  | InteractivePayLoad['type']
-  | 'flow'
-  | 'button'
-  | 'list'
-  | 'product_list'
-  | 'catalog_message'
-  | 'cta_url'
-  | 'location_request_message';
-export type WaMessageStatus = 'received' | 'sent' | 'failed';
+// The message vocabulary now lives in constants/whatsapp.ts (single source of
+// truth); re-exported here so existing model-based imports keep working.
+export type {
+  WaMessageDirection,
+  WaMessageType,
+  WaInteractiveType,
+  WaMessageStatus,
+} from '../constants/whatsapp.ts';
+
+import type {
+  WaMessageDirection,
+  WaMessageType,
+  WaInteractiveType,
+  WaMessageStatus,
+} from '../constants/whatsapp.ts';
 
 export interface IWhatsappMessage extends Document {
   tenantId: Types.ObjectId;
@@ -30,28 +38,22 @@ export interface IWhatsappMessage extends Document {
 
 const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
   {
-    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+    // Optional (not required) so genuinely pre-tenant outbound audit rows can be
+    // saved — e.g. the vendor-signup OTP, sent before any Tenant exists. Under a
+    // normal tenant context the tenantScope plugin still injects tenantId on every
+    // new doc, so tenant-owned messages always carry one; only bypass writes
+    // (runWithoutTenant) may leave it unset, and those rows surface only under bypass.
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: false, index: true },
     phoneNumber: { type: String, required: true },
-    direction: { type: String, enum: ['inbound', 'outbound'], required: true },
+    direction: { type: String, enum: WA_MESSAGE_DIRECTIONS, required: true },
     messageType: {
       type: String,
-      enum: ['text', 'interactive', 'order', 'reaction', 'location'],
+      enum: WA_MESSAGE_TYPES,
       required: true,
     },
     interactiveType: {
       type: String,
-      enum: [
-        'button_reply',
-        'list_reply',
-        'nfm_reply',
-        'flow',
-        'button',
-        'list',
-        'product_list',
-        'catalog_message',
-        'cta_url',
-        'location_request_message',
-      ],
+      enum: WA_INTERACTIVE_TYPES,
       default: null,
     },
     content: { type: String, required: true },
@@ -59,7 +61,7 @@ const WhatsappMessageSchema = new Schema<IWhatsappMessage>(
     timestamp: { type: Date, required: true },
     status: {
       type: String,
-      enum: ['received', 'sent', 'failed'],
+      enum: WA_MESSAGE_STATUSES,
       required: true,
     },
   },
