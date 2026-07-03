@@ -75,6 +75,10 @@ export interface ITenant extends Document {
   paymentRouting?: Partial<Record<PaymentMethod, PaymentProvider>>;
   address?: ITenantAddress;
   location_gps?: IGpsCoordinates;
+  // The tenant's single Facebook page URL, used as the Meta catalog `link` for
+  // every product this tenant syncs (WhatsApp commerce has no per-product web
+  // storefront). Required at sync time; products can't push without it.
+  facebookPageUrl?: string;
 }
 
 const WhatsappFlowIdsSchema = new Schema<IWhatsappFlowIds>(
@@ -192,6 +196,7 @@ const TenantSchema = new Schema<ITenant>(
       latitude: { type: Number },
       longitude: { type: Number },
     },
+    facebookPageUrl: { type: String, trim: true },
   },
   { timestamps: true },
 );

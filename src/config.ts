@@ -81,6 +81,15 @@ export const CONFIG = {
   MONGODB_HOST: process.env.MONGODB_HOST || '',
   WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
   WHATSAPP_SYSTEM_TOKEN: process.env.WHATSAPP_SYSTEM_TOKEN || '',
+  // Single source of truth for the Meta Graph API version across all endpoints
+  // (messages, flows, catalog items_batch). Bump here to move everything at once.
+  WHATSAPP_GRAPH_API_VERSION: process.env.WHATSAPP_GRAPH_API_VERSION || 'v21.0',
+  // Google Drive service account for product-image uploads. Not mandatory at
+  // boot — the upload endpoint fails clearly if unset. The private key is a
+  // secret (never logged); \n escapes in the env value are restored at use.
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '',
+  GOOGLE_DRIVE_FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
   WHATSAPP_FLOW_PRIVATE_KEY: process.env.WHATSAPP_FLOW_PRIVATE_KEY || '',
   WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: process.env.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE || '',
   // Language code of the WhatsApp authentication template used to deliver vendor

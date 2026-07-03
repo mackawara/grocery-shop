@@ -23,10 +23,9 @@ import UTILS from './index.ts';
 
 const TAG = '[WHATSAPP-FLOWS]';
 
-// Graph API version used for Flows endpoints. Kept in step with the messaging
-// controller (`outgoingMessages.ts`).
-const FLOWS_API_VERSION = 'v21.0';
-const GRAPH_BASE_URL = `https://graph.facebook.com/${FLOWS_API_VERSION}`;
+// Graph API version — single source of truth in CONFIG, shared with the
+// messaging controller and catalog sync.
+const GRAPH_BASE_URL = `https://graph.facebook.com/${CONFIG.WHATSAPP_GRAPH_API_VERSION}`;
 
 /**
  * Valid flow categories. At least one is required when creating a flow.

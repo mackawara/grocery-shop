@@ -15,7 +15,7 @@ import isEmpty from 'lodash/isEmpty.js';
 
 import { saveWhatsappMessage } from '../../utils/whatsapp.utils.js';
 
-const whatsappApiVersion = 'v21.0';
+const whatsappApiVersion = CONFIG.WHATSAPP_GRAPH_API_VERSION;
 
 export interface MessageResult {
   success: boolean;
@@ -232,7 +232,7 @@ export async function sendWhatsAppCatalogMessage({
   footer,
 }: WhatsAppSendCatalogMessageParams): Promise<MessageResult> {
   try {
-    const url = `https://graph.facebook.com/v24.0/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+    const url = `https://graph.facebook.com/${whatsappApiVersion}/${CONFIG.WHATSAPP_PHONE_NUMBER_ID}/messages`;
     const cleanedPhoneNumber = phone.replace(/\D/g, '');
     if (!CONFIG.WHATSAPP_SYSTEM_TOKEN || !phone) {
       logger.error('WhatsApp credentials not configured for catalog message');
