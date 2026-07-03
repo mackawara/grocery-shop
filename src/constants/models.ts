@@ -37,6 +37,70 @@ export enum DeliveryStatus {
   DELIVERED = 'delivered',
 }
 
+// --- Product / catalog ---
+
+// Product availability. Internal snake_case values; the catalog formatter maps
+// these to Meta's feed strings ("in stock", "out of stock", ...) on export. We
+// never store Meta's format — storage is optimised for arithmetic/analytics.
+export enum ProductAvailability {
+  IN_STOCK = 'in_stock',
+  OUT_OF_STOCK = 'out_of_stock',
+  PREORDER = 'preorder',
+  AVAILABLE_FOR_ORDER = 'available_for_order',
+  DISCONTINUED = 'discontinued',
+}
+
+export enum ProductCondition {
+  NEW = 'new',
+  REFURBISHED = 'refurbished',
+  USED = 'used',
+}
+
+// Internal lifecycle of a Product row, independent of Meta availability.
+// ARCHIVED products are DELETEd from the Meta catalog on the next sync.
+export enum ProductStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+}
+
+// Sync state of a Product against the Meta (Facebook) catalog.
+export enum CatalogSyncStatus {
+  NOT_SYNCED = 'not_synced',
+  PENDING = 'pending',
+  SYNCED = 'synced',
+  ERROR = 'error',
+}
+
+// Delivery vehicle tiers, smallest -> largest. Shared by the product
+// minimum-vehicle tag and (later) the delivery quote engine.
+export enum VehicleTier {
+  BIKE = 'bike',
+  VAN = 'van',
+  SMALL_TRUCK = 'small_truck',
+  TRUCK = 'truck',
+}
+
+// Currencies the platform accepts, as ISO-4217 codes. NOTE: Zimbabwe Gold (ZiG)
+// is code `ZWG`. Meta's catalog may not accept all of these — validate there.
+export enum Currency {
+  USD = 'USD',
+  ZAR = 'ZAR',
+  ZWG = 'ZWG', // Zimbabwe Gold (ZiG)
+}
+
+export enum WeightUnit {
+  KG = 'kg',
+  G = 'g',
+  LB = 'lb',
+  OZ = 'oz',
+}
+
+export enum DimensionUnit {
+  CM = 'cm',
+  IN = 'in',
+}
+
 export enum UserRole {
   ADMIN = 'admin',
   VENDOR = 'vendor',

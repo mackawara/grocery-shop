@@ -139,6 +139,9 @@ export const signupStart = async (req: Request, res: Response): Promise<void> =>
           ],
         }),
     );
+    if (CONFIG.IS_LOCAL_ENVIRONMENT) {
+      logger.info(`${TAG} OTP for ${phone} is ${code}`);
+    }
     if (!sent.success) {
       await releasePhoneClaim(phone);
       logger.error(`${TAG} OTP send failed: ${sent.error}`);
