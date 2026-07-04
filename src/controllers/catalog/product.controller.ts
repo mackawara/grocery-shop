@@ -7,8 +7,6 @@ import {
   ProductCondition,
   ProductStatus,
   VehicleTier,
-  WeightUnit,
-  DimensionUnit,
   CatalogSyncStatus,
 } from '../../constants/models.ts';
 import {
@@ -43,16 +41,11 @@ const moneySchema = z.object({
   currency: z.enum(Currency),
 });
 
-const weightSchema = z.object({
-  value: z.number().nonnegative(),
-  unit: z.enum(WeightUnit),
-});
-
+// Dimensions in cm; weight (in createSchema) in kg — units are standardised.
 const dimensionsSchema = z.object({
   length: z.number().nonnegative(),
   width: z.number().nonnegative(),
   height: z.number().nonnegative(),
-  unit: z.enum(DimensionUnit),
 });
 
 const createSchema = z.object({
@@ -85,7 +78,7 @@ const createSchema = z.object({
   pattern: z.string().trim().optional(),
   customLabels: z.array(z.string().trim()).max(5).optional(),
   // Delivery physicals — optional; gate delivery readiness, not existence.
-  weight: weightSchema.optional(),
+  weight: z.number().nonnegative().optional(), // kilograms
   dimensions: dimensionsSchema.optional(),
   minVehicle: z.enum(VehicleTier).optional(),
 });

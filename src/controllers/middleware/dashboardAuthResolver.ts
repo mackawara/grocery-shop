@@ -5,6 +5,7 @@ import VendorUser from '../../models/VendorUser.ts';
 import type { IVendorUser } from '../../models/VendorUser.ts';
 import { TenantStatus, VendorUserStatus } from '../../constants/models.ts';
 import { runWithTenant, runWithoutTenant } from '../../context/tenantContext.ts';
+import { resolveMembership } from '../../services/vendorMembership.ts';
 import { logger } from '../../services/logger.ts';
 
 const TAG = '[dashboardAuthResolver]';
@@ -17,25 +18,22 @@ export interface DashboardActor {
   role: string;
 }
 
-// Resolve (and on first login, bind) the VendorUser for this identity. Matches
-// by authSubject; on first login the row was created INVITED with no subject, so
-// we fall back to the email anchor and bind sub + activate. Returns null when the
-// identity isn't provisioned for this tenant, is disabled, or the email row is
-// already bound to a different subject. Runs inside runWithTenant (scoped).
+// Resolve (and on first login, bind) the VendorUser for this identity. Applies
+// the shared membership rule (see resolveMembership) — subject first, then the
+// verified-email anchor on first login — with a tenant-scoped finder: we have
+// already established the session's tenant, so a stale session pointing at the
+// wrong tenant simply finds no row here and is denied (fails closed). Then
+// binds the subject + activates on first login. Returns null when the identity
+// isn't provisioned for this tenant, is disabled, or the email is bound to a
+// different subject. Runs inside runWithTenant (scoped).
 const resolveVendorUser = async (
   sub: string,
   email: string | undefined,
+  emailVerified: boolean,
 ): Promise<IVendorUser | null> => {
-  let vendorUser = await VendorUser.findOne({ authSubject: sub });
-
-  if (!vendorUser && email) {
-    const byEmail = await VendorUser.findOne({ email });
-    if (byEmail && byEmail.authSubject && byEmail.authSubject !== sub) {
-      // Email belongs to a different identity — refuse rather than rebind.
-      return null;
-    }
-    vendorUser = byEmail;
-  }
+  const vendorUser = await resolveMembership(sub, email, emailVerified, (filter) =>
+    VendorUser.findOne(filter).exec(),
+  );
 
   if (!vendorUser || vendorUser.status === VendorUserStatus.DISABLED) {
     return null;
@@ -70,7 +68,7 @@ export const dashboardAuthResolver = async (
     return;
   }
 
-  const { sub, email } = auth;
+  const { sub, email, emailVerified } = auth;
   const tenantClaim = auth.tenantId;
 
   if (!tenantClaim) {
@@ -109,7 +107,7 @@ export const dashboardAuthResolver = async (
   await runWithTenant(
     tenant._id as Types.ObjectId,
     async () => {
-      const vendorUser = await resolveVendorUser(sub, email);
+      const vendorUser = await resolveVendorUser(sub, email, emailVerified);
       if (!vendorUser) {
         logger.warn(`${TAG} no active VendorUser for sub in tenant ${tenant._id}`);
         res.status(403).json({ error: 'You do not have access to this account.' });

@@ -60,9 +60,13 @@ export interface ITenant extends Document {
   slug: string;
   email: string;
   country: string;
-  whatsappPhoneNumberId: string;
+  // WhatsApp assets are attached when the vendor's WhatsApp is onboarded —
+  // optional so a vendor can exist (signup, delivery config, catalog drafts)
+  // before WhatsApp is connected. The webhook resolver matches BY phone-number
+  // id, so a tenant without one simply never receives WhatsApp traffic.
+  whatsappPhoneNumberId?: string;
   whatsappCatalogId?: string;
-  whatsappBusinessId: string;
+  whatsappBusinessId?: string;
   // Authentik group pk for this tenant, captured at signup. The group is the
   // tenant's identity boundary in Authentik; staff invitations are placed into
   // it so they resolve back to this tenant on login.
@@ -131,6 +135,36 @@ const PaymentRoutingSchema = new Schema<Partial<Record<PaymentMethod, PaymentPro
   { _id: false },
 );
 
+// What a tenant must have before it may go ACTIVE. PENDING/TRIAL tenants can
+// exist with nothing but signup fields (so delivery/catalog can be configured
+// pre-onboarding), but ACTIVE means live on WhatsApp — connectivity fields and
+// at least one payment and delivery method are non-negotiable. Shared by the
+// pre-validate backstop below and the admin activate endpoint, so the reported
+// missing-field list and the enforced rule can never drift apart.
+export const missingActivationFields = (tenant: ITenant): string[] => {
+  const missing: string[] = [];
+  if (!tenant.whatsappPhoneNumberId?.trim()) {
+    missing.push('whatsappPhoneNumberId');
+  }
+  if (!tenant.whatsappBusinessId?.trim()) {
+    missing.push('whatsappBusinessId');
+  }
+  if (!tenant.paymentMethods?.length) {
+    missing.push('paymentMethods');
+  }
+  if (!tenant.deliveryMethods?.length) {
+    missing.push('deliveryMethods');
+  }
+  return missing;
+};
+
+export class TenantActivationError extends Error {
+  constructor(public readonly missing: string[]) {
+    super(`Tenant cannot be activated; missing: ${missing.join(', ')}`);
+    this.name = 'TenantActivationError';
+  }
+}
+
 const slugify = (input: string): string =>
   input
     .toLowerCase()
@@ -164,9 +198,11 @@ const TenantSchema = new Schema<ITenant>(
     },
     email: { type: String, required: true, unique: true, index: true },
     country: { type: String, required: true },
-    whatsappPhoneNumberId: { type: String, required: true, unique: true },
+    // Optional until WhatsApp onboarding; uniqueness enforced by the sparse
+    // index below (plain `unique` would collide on missing values).
+    whatsappPhoneNumberId: { type: String, trim: true },
     whatsappCatalogId: { type: String },
-    whatsappBusinessId: { type: String, required: true },
+    whatsappBusinessId: { type: String, trim: true },
     // Authentik group pk, stamped at signup; targets staff invitations.
     authGroupPk: { type: String },
     whatsappFlowIds: { type: WhatsappFlowIdsSchema, default: () => ({}) },
@@ -201,6 +237,10 @@ const TenantSchema = new Schema<ITenant>(
   { timestamps: true },
 );
 
+// Unique only when present: multiple tenants may await WhatsApp onboarding, but
+// no two tenants can claim the same phone-number id.
+TenantSchema.index({ whatsappPhoneNumberId: 1 }, { unique: true, sparse: true });
+
 // TODO(controller): the exists()+save sequence below is not atomic. Two
 // concurrent signups with the same displayName can both pick the same slug and
 // one will fail with a duplicate-key error (E11000) on the unique slug index.
@@ -222,6 +262,24 @@ TenantSchema.pre<ITenant>('validate', async function () {
     candidate = `${base}-${suffix}`;
   }
   this.slug = candidate;
+});
+
+// Backstop: no code path may create a tenant as ACTIVE or flip one to ACTIVE
+// unless it is fully onboarded (see missingActivationFields). The admin
+// activate endpoint pre-checks and reports the missing fields; this hook holds
+// every other save path to the same bar. Already-ACTIVE tenants saving
+// unrelated changes are untouched — only the transition is gated.
+TenantSchema.pre<ITenant>('validate', function () {
+  if (this.status !== TenantStatus.ACTIVE) {
+    return;
+  }
+  if (!this.isNew && !this.isModified('status')) {
+    return;
+  }
+  const missing = missingActivationFields(this);
+  if (missing.length > 0) {
+    throw new TenantActivationError(missing);
+  }
 });
 
 export default mongoose.model<ITenant>('Tenant', TenantSchema);

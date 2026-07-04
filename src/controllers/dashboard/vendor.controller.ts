@@ -141,6 +141,13 @@ export const signupStart = async (req: Request, res: Response): Promise<void> =>
     );
     if (CONFIG.IS_LOCAL_ENVIRONMENT) {
       logger.info(`${TAG} OTP for ${phone} is ${code}`);
+      const pending: PendingSignup = { displayName, email, country, ownerName };
+      await redisClient.set(pendingKey(phone), JSON.stringify(pending), {
+        EX: SIGNUP_OTP_TTL_SECONDS,
+      });
+
+      res.status(200).json(START_OK);
+      return;
     }
     if (!sent.success) {
       await releasePhoneClaim(phone);

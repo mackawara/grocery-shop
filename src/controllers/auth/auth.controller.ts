@@ -1,6 +1,9 @@
 import type { Request, Response } from 'express';
 
 import { CONFIG } from '../../config.ts';
+import VendorUser from '../../models/VendorUser.ts';
+import { runWithoutTenant } from '../../context/tenantContext.ts';
+import { resolveMembership } from '../../services/vendorMembership.ts';
 import { client, getOidcConfig } from '../../services/authentikOidc.ts';
 import { logger } from '../../services/logger.ts';
 
@@ -87,11 +90,26 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   const sub = claims.sub;
   const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : undefined;
   const emailVerified = claims.email_verified === true;
-  const tenantId = typeof claims.tenant_id === 'string' ? claims.tenant_id : undefined;
   const groups = Array.isArray(claims.groups)
     ? claims.groups.filter((g): g is string => typeof g === 'string')
     : [];
   const expiresIn = tokens.expiresIn();
+
+  // Tenant membership is authoritative in our DB, not in the token: Authentik
+  // asserts *who* this identity is; the VendorUser row asserts *which tenant*
+  // they belong to (and dashboardAuthResolver re-checks it on every request).
+  // The tenant is unknown until the row is found, so this is a sanctioned
+  // cross-tenant read. No row means no vendor seat (e.g. a platform admin),
+  // which falls through to the /console landing below.
+  const membership = await runWithoutTenant(
+    'oidc-callback vendor membership resolution',
+    'VendorUser.findOne({ authSubject }) / findOne({ email })',
+    () =>
+      resolveMembership(sub, email, emailVerified, (filter) =>
+        VendorUser.findOne(filter).lean().exec(),
+      ),
+  );
+  const tenantId = membership ? membership.tenantId.toString() : undefined;
 
   // Regenerate the session id once the identity is established (defeats session
   // fixation), then persist the identity + tokens server-side.

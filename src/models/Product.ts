@@ -6,8 +6,6 @@ import {
   ProductStatus,
   CatalogSyncStatus,
   VehicleTier,
-  WeightUnit,
-  DimensionUnit,
   Currency,
 } from '../constants/models.ts';
 import { tenantScope } from './plugins/tenantScope.ts';
@@ -18,8 +16,6 @@ export {
   ProductStatus,
   CatalogSyncStatus,
   VehicleTier,
-  WeightUnit,
-  DimensionUnit,
   Currency,
 };
 
@@ -32,22 +28,20 @@ export interface IMoney {
   currency: Currency; // ISO 4217, restricted to the platform's supported set
 }
 
-export interface IProductWeight {
-  value: number;
-  unit: WeightUnit;
-}
-
+// Dimensions are always in centimetres (see WEIGHT_UNIT/DIMENSION_UNIT).
 export interface IProductDimensions {
   length: number;
   width: number;
   height: number;
-  unit: DimensionUnit;
 }
 
-export interface IProduct extends Document {
-  tenantId: Types.ObjectId;
-
-  // Meta retailer id — a tenant-defined SKU, unique per tenant.
+// The canonical, caller-writable field set for a product — the create/update
+// surface. Every other Product type derives from this: `IProduct` extends it
+// with persistence/sync metadata, the service's `ProductInput` aliases it, and
+// the Meta exporter picks the subset it sends. Keep field definitions here only.
+export interface ProductFields {
+  // Meta retailer id — a tenant-defined SKU, unique per tenant. Immutable once
+  // set (changing it would orphan the catalog item).
   sku: string;
 
   // --- Meta feed fields (exported to the Facebook catalog) ---
@@ -86,12 +80,18 @@ export interface IProduct extends Document {
   // quote engine and never exported. Optional to store — existing catalogs have
   // none — and gate DELIVERY readiness (getProductDeliveryReadiness), not the
   // product's existence or its Meta sync. ---
-  weight?: IProductWeight;
-  dimensions?: IProductDimensions;
+  weight?: number; // kilograms
+  dimensions?: IProductDimensions; // centimetres
   minVehicle?: VehicleTier;
 
-  // --- Internal lifecycle + Meta catalog sync metadata ---
+  // Lifecycle. Drives sync (ACTIVE→push, ARCHIVED→delete, DRAFT→skip).
   status: ProductStatus;
+}
+
+export interface IProduct extends ProductFields, Document {
+  tenantId: Types.ObjectId;
+
+  // --- Meta catalog sync metadata (owned by the sync layer, not callers) ---
   fbItemId?: string; // Meta's id for the synced item
   syncStatus: CatalogSyncStatus;
   lastSyncedAt?: Date;
@@ -128,20 +128,11 @@ const MoneySchema = new Schema<IMoney>(
   { _id: false },
 );
 
-const WeightSchema = new Schema<IProductWeight>(
-  {
-    value: { type: Number, required: true, min: 0 },
-    unit: { type: String, enum: Object.values(WeightUnit), required: true },
-  },
-  { _id: false },
-);
-
 const DimensionsSchema = new Schema<IProductDimensions>(
   {
     length: { type: Number, required: true, min: 0 },
     width: { type: Number, required: true, min: 0 },
     height: { type: Number, required: true, min: 0 },
-    unit: { type: String, enum: Object.values(DimensionUnit), required: true },
   },
   { _id: false },
 );
@@ -188,8 +179,9 @@ const ProductSchema = new Schema<IProduct>(
     pattern: { type: String, trim: true },
     customLabels: { type: [String], default: undefined },
 
-    // --- Delivery physicals (optional; gate delivery readiness, not existence) ---
-    weight: { type: WeightSchema },
+    // --- Delivery physicals (optional; gate delivery readiness, not existence).
+    // weight in kg, dimensions in cm — units are standardised, never stored. ---
+    weight: { type: Number, min: 0 },
     dimensions: { type: DimensionsSchema },
     minVehicle: {
       type: String,

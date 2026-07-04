@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { Types } from 'mongoose';
 import { isValidObjectId } from 'mongoose';
-import Tenant from '../../models/Tenant.ts';
+import Tenant, { missingActivationFields } from '../../models/Tenant.ts';
 import type { ITenant } from '../../models/Tenant.ts';
 import VendorUser from '../../models/VendorUser.ts';
 import { TenantStatus, UserRole } from '../../constants/models.ts';
@@ -127,6 +127,48 @@ export const approveTenant = (req: Request, res: Response): Promise<void> =>
 // POST /admin/tenants/:id/reject — PENDING -> REJECTED.
 export const rejectTenant = (req: Request, res: Response): Promise<void> =>
   transitionPendingTenant(req, res, TenantStatus.REJECTED, 'rejected');
+
+// POST /admin/tenants/:id/activate — TRIAL -> ACTIVE. Approval (PENDING ->
+// TRIAL) grants dashboard access so the vendor can configure delivery, catalog,
+// etc.; activation is the production go-live and is gated on onboarding
+// readiness. 422 lists exactly which fields are missing so the operator knows
+// what to finish. The Tenant pre-validate hook enforces the same rule as a
+// backstop for any other path that sets ACTIVE.
+export const activateTenant = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    res.status(400).json({ error: 'Invalid tenant id.' });
+    return;
+  }
+
+  const tenant = await Tenant.findById(id);
+  if (!tenant) {
+    res.status(404).json({ error: 'Tenant not found.' });
+    return;
+  }
+  if (tenant.status !== TenantStatus.TRIAL) {
+    res.status(409).json({ error: `Tenant is ${tenant.status}, not trial.` });
+    return;
+  }
+
+  const missing = missingActivationFields(tenant);
+  if (missing.length > 0) {
+    res.status(422).json({
+      error: 'Tenant is not ready for activation.',
+      missingFields: missing,
+    });
+    return;
+  }
+
+  tenant.status = TenantStatus.ACTIVE;
+  await tenant.save();
+
+  const actor = res.locals.platformActor as PlatformActor | undefined;
+  logger.info(
+    `${TAG} activated tenant ${tenant.slug} (${tenant._id}) by ${actor?.email ?? 'unknown'}`,
+  );
+  res.status(200).json({ status: tenant.status, tenant: { id: tenant._id, slug: tenant.slug } });
+};
 
 // POST /admin/tenants/:id/resend-invite — re-send the owner's recovery email for
 // an already-approved tenant (approve is one-shot; it 409s once not PENDING). Use

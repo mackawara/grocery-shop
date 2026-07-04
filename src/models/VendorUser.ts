@@ -65,6 +65,16 @@ VendorUserSchema.index({ tenantId: 1, phoneNumber: 1 }, { unique: true });
 VendorUserSchema.index({ tenantId: 1, email: 1 }, { unique: true });
 VendorUserSchema.index({ tenantId: 1, authSubject: 1 }, { unique: true, sparse: true });
 
+// Global login-lookup keys. The dashboard login path resolves a tenant from the
+// identity alone (see resolveMembership), before any tenant context exists, so
+// authSubject and email must be unique platform-wide — the v1 invariant of one
+// identity / one email -> exactly one vendor seat (already upheld upstream by
+// Authentik's unique usernames and the signup provisioning path). These
+// complement, not replace, the per-tenant natural-key indexes above.
+// authSubject is sparse (absent until first login); email is always present.
+VendorUserSchema.index({ authSubject: 1 }, { unique: true, sparse: true });
+VendorUserSchema.index({ email: 1 }, { unique: true });
+
 VendorUserSchema.plugin(tenantScope);
 
 export default mongoose.model<IVendorUser>('VendorUser', VendorUserSchema);
