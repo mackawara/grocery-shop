@@ -18,6 +18,7 @@ import {
   ProductNotSyncableError,
 } from '../../utils/metaProductFeed.ts';
 import type { MetaBatchRequest, MetaExportTenant } from '../../utils/metaProductFeed.ts';
+import { sleep } from '../../utils/async.ts';
 
 const TAG = '[CATALOG_SYNC]';
 
@@ -31,8 +32,6 @@ export interface CatalogSyncResult {
   notReady: number; // missing required fields / not published — excluded
   failed: number; // requests Meta (or the network) rejected
 }
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Fingerprint of the exact payload we would send for a product. Stored on the
 // product as `contentHash` after a successful sync; on the next run, if the

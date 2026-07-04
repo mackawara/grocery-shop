@@ -1,7 +1,12 @@
 import currency from 'currency.js';
-import type { IProduct, IMoney, IProductWeight } from '../models/Product.ts';
+import type { ProductFields, IMoney } from '../models/Product.ts';
 import { getProductSyncReadiness } from '../models/Product.ts';
-import { ProductAvailability, ProductCondition, Currency } from '../constants/models.ts';
+import {
+  ProductAvailability,
+  ProductCondition,
+  Currency,
+  WEIGHT_UNIT,
+} from '../constants/models.ts';
 
 // Maps our internal Product model -> the payload the Meta (Facebook) Catalog
 // Batch API expects. Pure and side-effect free: no DB, no network. The sync
@@ -47,8 +52,8 @@ export const formatMoney = (money: IMoney): string => {
   return `${amount} ${money.currency}`;
 };
 
-/** Weight -> Meta's "1.5 kg" shipping_weight string (units already match Meta). */
-export const formatWeight = (weight: IProductWeight): string => `${weight.value} ${weight.unit}`;
+/** Weight (kg) -> Meta's "1.5 kg" shipping_weight string. */
+export const formatWeight = (weightKg: number): string => `${weightKg} ${WEIGHT_UNIT}`;
 
 /** Closed ISO-8601 range Meta wants for sale_price_effective_date. */
 const formatDateRange = (start: Date, end: Date): string =>
@@ -96,37 +101,11 @@ export interface MetaBatchRequest {
   data?: MetaProductData;
 }
 
-// Only the product fields the mapper reads — lets callers pass leans/DTOs.
-type ProductForMeta = Pick<
-  IProduct,
-  | 'sku'
-  | 'title'
-  | 'description'
-  | 'availability'
-  | 'condition'
-  | 'price'
-  | 'salePrice'
-  | 'salePriceEffectiveStart'
-  | 'salePriceEffectiveEnd'
-  | 'imageLink'
-  | 'additionalImageLinks'
-  | 'brand'
-  | 'quantity'
-  | 'googleProductCategory'
-  | 'fbProductCategory'
-  | 'productType'
-  | 'gtin'
-  | 'mpn'
-  | 'itemGroupId'
-  | 'color'
-  | 'size'
-  | 'gender'
-  | 'ageGroup'
-  | 'material'
-  | 'pattern'
-  | 'customLabels'
-  | 'weight'
->;
+// The product fields the exporter reads: every writable field except the ones
+// that never go to Meta (status is internal; dimensions/minVehicle are ours for
+// delivery). Derived from ProductFields so new catalog fields flow through
+// without editing a hand-kept list. Accepts leans/DTOs, not just hydrated docs.
+type ProductForMeta = Omit<ProductFields, 'status' | 'dimensions' | 'minVehicle'>;
 
 // The tenant fields the exporter needs: `facebookPageUrl` is the product `link`;
 // `displayName` is the brand fallback when a product has no brand of its own.
@@ -229,7 +208,7 @@ export const toMetaProductData = (
   if (product.pattern) {
     data.pattern = product.pattern;
   }
-  if (product.weight) {
+  if (typeof product.weight === 'number') {
     data.shipping_weight = formatWeight(product.weight);
   }
   if (product.customLabels) {

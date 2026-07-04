@@ -17,8 +17,25 @@ import {
   importProductsHandler,
   uploadProductImageHandler,
 } from '../controllers/catalog/product.controller.ts';
+import {
+  createZoneHandler,
+  listZonesHandler,
+  getZoneHandler,
+  updateZoneHandler,
+  deleteZoneHandler,
+  createVehicleHandler,
+  listVehiclesHandler,
+  getVehicleHandler,
+  updateVehicleHandler,
+  deleteVehicleHandler,
+  listRatesHandler,
+  upsertRateHandler,
+  deleteRateHandler,
+} from '../controllers/delivery/deliveryConfig.controller.ts';
 import { rateLimit } from '../controllers/middleware/rateLimit.ts';
 import { dashboardAuthResolver } from '../controllers/middleware/dashboardAuthResolver.ts';
+import { requireRole } from '../controllers/middleware/requireRole.ts';
+import { UserRole } from '../constants/models.ts';
 import { normalizePhone } from '../utils/phone.ts';
 
 const router = Router();
@@ -51,7 +68,14 @@ router.post('/invitations', dashboardAuthResolver, inviteVendorUser);
 // from the session (res.locals.actor.tenantId) and runs the handler inside
 // runWithTenant. No tenant id in the path or body — the client never sends one,
 // so there is no id to spoof (per the tenant-isolation rule in CLAUDE.md).
+// Reads are open to any authenticated tenant member; writes (create/update/
+// publish/archive/import/image) are owner- or manager-only, same gate as the
+// delivery config below and the staff-invite path.
 const catalog = [dashboardAuthResolver] as const;
+const catalogWrite = [
+  dashboardAuthResolver,
+  requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER),
+] as const;
 const PRODUCTS = '/products';
 
 // In-memory upload for the bulk import; xlsx feeds are small. Cap at 5 MB and
@@ -80,13 +104,39 @@ const uploadImage = multer({
   },
 });
 
-router.post(PRODUCTS, ...catalog, createProductHandler);
+router.post(PRODUCTS, ...catalogWrite, createProductHandler);
 router.get(PRODUCTS, ...catalog, listProductsHandler);
-router.post(`${PRODUCTS}/import`, ...catalog, uploadFeed.single('file'), importProductsHandler);
-router.post(`${PRODUCTS}/image`, ...catalog, uploadImage.single('file'), uploadProductImageHandler);
+router.post(`${PRODUCTS}/import`, ...catalogWrite, uploadFeed.single('file'), importProductsHandler);
+router.post(`${PRODUCTS}/image`, ...catalogWrite, uploadImage.single('file'), uploadProductImageHandler);
 router.get(`${PRODUCTS}/:productId`, ...catalog, getProductHandler);
-router.patch(`${PRODUCTS}/:productId`, ...catalog, updateProductHandler);
-router.post(`${PRODUCTS}/:productId/publish`, ...catalog, publishProductHandler);
-router.post(`${PRODUCTS}/:productId/archive`, ...catalog, archiveProductHandler);
+router.patch(`${PRODUCTS}/:productId`, ...catalogWrite, updateProductHandler);
+router.post(`${PRODUCTS}/:productId/publish`, ...catalogWrite, publishProductHandler);
+router.post(`${PRODUCTS}/:productId/archive`, ...catalogWrite, archiveProductHandler);
+
+// Delivery config — session-scoped like the rest of /dashboard. `config` is just
+// the auth resolver (tenant comes from the session, never the URL); reads are
+// open to any authenticated tenant member. `configWrite` adds a role gate so
+// only the owner (VENDOR) or a shop manager can mutate zones/vehicles/rates —
+// mirrors the staff-invite gating (INVITER_ROLES) so a sales rep can view the
+// delivery setup but not change pricing/coverage.
+const config = [dashboardAuthResolver] as const;
+const configWrite = [
+  dashboardAuthResolver,
+  requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER),
+] as const;
+router.get('/zones', ...config, listZonesHandler);
+router.post('/zones', ...configWrite, createZoneHandler);
+router.get('/zones/:id', ...config, getZoneHandler);
+router.patch('/zones/:id', ...configWrite, updateZoneHandler);
+router.delete('/zones/:id', ...configWrite, deleteZoneHandler);
+router.get('/vehicles', ...config, listVehiclesHandler);
+router.post('/vehicles', ...configWrite, createVehicleHandler);
+router.get('/vehicles/:id', ...config, getVehicleHandler);
+router.patch('/vehicles/:id', ...configWrite, updateVehicleHandler);
+router.delete('/vehicles/:id', ...configWrite, deleteVehicleHandler);
+// Rate matrix: PUT sets a (zone × tier) cell — upsert, no separate POST/PATCH.
+router.get('/rates', ...config, listRatesHandler);
+router.put('/rates', ...configWrite, upsertRateHandler);
+router.delete('/rates/:id', ...configWrite, deleteRateHandler);
 
 export default router;

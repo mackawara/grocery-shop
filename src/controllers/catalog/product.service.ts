@@ -1,8 +1,8 @@
-import type { Document, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { logger } from '../../services/logger.ts';
 import { requireTenantId, runWithTenant } from '../../context/tenantContext.ts';
 import ProductModel, { getProductSyncReadiness } from '../../models/Product.ts';
-import type { IProduct } from '../../models/Product.ts';
+import type { IProduct, ProductFields } from '../../models/Product.ts';
 import { ProductStatus, CatalogSyncStatus } from '../../constants/models.ts';
 import { syncTenantCatalog } from './catalogSync.controller.ts';
 
@@ -15,21 +15,10 @@ const TAG = '[PRODUCT]';
 // syncAllPendingCatalogs. All reads/writes go through the tenantScope-plugged
 // model, so they are automatically scoped to the current tenant context.
 
-// Fields a caller may set on a product (everything except Mongoose internals,
-// timestamps, tenantId — stamped by the plugin — and the sync bookkeeping we
-// own here).
-export type ProductInput = Omit<
-  IProduct,
-  | keyof Document
-  | 'createdAt'
-  | 'updatedAt'
-  | 'tenantId'
-  | 'syncStatus'
-  | 'fbItemId'
-  | 'lastSyncedAt'
-  | 'lastSyncError'
-  | 'contentHash'
->;
+// The caller-writable field set is the model's canonical ProductFields —
+// tenantId (stamped by the plugin), sync metadata, and timestamps are excluded
+// there by construction.
+export type ProductInput = ProductFields;
 
 // status/availability/condition all have schema defaults, so they're optional on
 // create (Mongoose fills them in).

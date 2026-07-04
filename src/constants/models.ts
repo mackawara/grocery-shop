@@ -81,6 +81,33 @@ export enum VehicleTier {
   TRUCK = 'truck',
 }
 
+// Smallest -> largest. Rank = index; used to pick the smallest vehicle that fits
+// and to honour a product's minimum-vehicle floor.
+export const VEHICLE_TIER_ORDER: readonly VehicleTier[] = [
+  VehicleTier.BIKE,
+  VehicleTier.VAN,
+  VehicleTier.SMALL_TRUCK,
+  VehicleTier.TRUCK,
+];
+
+// How a rate-matrix cell (zone × vehicle tier) prices a delivery:
+//  FLAT        — one fixed fee for the whole zone.
+//  BASE_PER_KM — base fee + perKm × distance.
+//  NOT_SERVED  — this vehicle does not deliver to this zone (coverage control).
+export enum DeliveryRateKind {
+  FLAT = 'flat',
+  BASE_PER_KM = 'base_per_km',
+  NOT_SERVED = 'not_served',
+}
+
+// How a delivery zone is matched to a customer GPS pin:
+//  RING    — a distance band {minKm,maxKm} from the tenant's shop (haversine).
+//  POLYGON — a GeoJSON boundary resolved with MongoDB $geoIntersects (2dsphere).
+export enum DeliveryZoneKind {
+  RING = 'ring',
+  POLYGON = 'polygon',
+}
+
 // Currencies the platform accepts, as ISO-4217 codes. NOTE: Zimbabwe Gold (ZiG)
 // is code `ZWG`. Meta's catalog may not accept all of these — validate there.
 export enum Currency {
@@ -89,17 +116,11 @@ export enum Currency {
   ZWG = 'ZWG', // Zimbabwe Gold (ZiG)
 }
 
-export enum WeightUnit {
-  KG = 'kg',
-  G = 'g',
-  LB = 'lb',
-  OZ = 'oz',
-}
-
-export enum DimensionUnit {
-  CM = 'cm',
-  IN = 'in',
-}
+// Units of measurement are standardised platform-wide: weight is always stored
+// in KILOGRAMS and dimensions in CENTIMETRES, so a unit is never stored per
+// product. These labels exist only for display/export (e.g. Meta shipping_weight).
+export const WEIGHT_UNIT = 'kg' as const;
+export const DIMENSION_UNIT = 'cm' as const;
 
 export enum UserRole {
   ADMIN = 'admin',

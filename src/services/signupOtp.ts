@@ -3,6 +3,7 @@ import { redisClient } from './redis.ts';
 import { globalKey } from '../utils/tenantKey.ts';
 import { SIGNUP_OTP_TTL_SECONDS, SIGNUP_OTP_MAX_ATTEMPTS } from '../constants/auth.ts';
 import { logger } from './logger.ts';
+import { CONFIG } from '../config.ts';
 
 const TAG = '[SIGNUP-OTP]';
 
@@ -48,6 +49,9 @@ export const generateSignupOtp = async (phone: string): Promise<string> => {
   await redisClient.set(otpKey(phone), hashOtp(phone, code), { EX: ttl });
   await redisClient.del(attemptsKey(phone));
   logger.info(`${TAG} issued OTP for ${maskPhone(phone)} (ttl ${ttl}s)`);
+  if (CONFIG.IS_LOCAL_ENVIRONMENT) {
+    logger.info(`${TAG} OTP for ${maskPhone(phone)} is ${code}`);
+  }
   return code;
 };
 
