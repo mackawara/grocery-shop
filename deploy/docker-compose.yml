@@ -1,0 +1,62 @@
+# Production stack: API + Redis + Dashboard. Lives in the repo under deploy/
+# and is rsynced to the server (default /opt/grocery-shop) by the API deploy
+# workflow. Host Caddy terminates TLS and proxies to the loopback ports.
+#
+# Interpolation values (images, tags, ports) come from ./.env — managed by
+# deploy.sh, never edited by hand. App secrets live in ./api.env, which is
+# maintained on the server only (never in git, never overwritten by deploys).
+services:
+  api:
+    image: '${API_IMAGE}:${API_TAG:-latest}'
+    container_name: grocery_api
+    env_file:
+      - api.env
+    environment:
+      # Keep the app's listen port and the published port in lockstep, and
+      # point it at the redis service on the compose network.
+      - PORT=${PORT:-4000}
+      - REDIS_HOST=redis
+    ports:
+      # Loopback only — Caddy proxies api.<domain> here.
+      - '127.0.0.1:${PORT:-4000}:${PORT:-4000}'
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:${PORT:-4000}/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+
+  dashboard:
+    image: '${DASHBOARD_IMAGE}:${DASHBOARD_TAG:-latest}'
+    container_name: grocery_dashboard
+    ports:
+      # Loopback only — Caddy proxies dashboard.<domain> here.
+      - '127.0.0.1:${DASHBOARD_PORT:-8080}:80'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: grocery_redis
+    command: redis-server --appendonly yes
+    # No published ports — reachable only from the compose network.
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  redis_data:

@@ -1,21 +1,28 @@
-FROM node:22-alpine
+# --- Build stage: full deps + TypeScript compile ---
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy dependency files
 COPY package.json yarn.lock ./
-
-# Install all dependencies
 RUN yarn install --frozen-lockfile
 
-# Copy project files
 COPY . .
-
-# Build the application
 RUN yarn build
 
-# Expose app port
-EXPOSE 5175
+# --- Production stage: prod deps only, non-root ---
+FROM node:22-alpine AS production
 
-# Start the app
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package.json yarn.lock ./
+# --ignore-scripts skips the husky "prepare" hook (no .git in the image)
+RUN yarn install --frozen-lockfile --production --ignore-scripts && yarn cache clean
+
+COPY --from=build /app/dist ./dist
+
+USER node
+
+EXPOSE 4000
+
 CMD ["node", "dist/index.js"]
