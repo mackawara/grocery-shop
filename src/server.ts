@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import express from 'express';
+import mongoose from 'mongoose';
 import session from 'express-session';
 import { RedisStore } from 'connect-redis';
 import { logger } from './services/logger.js';
@@ -24,6 +25,23 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: CONFIG.DASHBOARD_URL, credentials: true }));
 app.use(express.json());
 app.use(helmet());
+
+// Unauthenticated readiness probe consumed by the Docker healthcheck and the
+// deploy pipeline's rollback gate. Registered before the session middleware so
+// health pings never touch the Redis session store or emit cookies. Reports
+// dependency state only — no tenant data. 503 until Mongo and Redis are both
+// connected.
+app.get('/health', (req: Request, res: Response) => {
+  const mongoReady = mongoose.connection.readyState === 1;
+  const redisReady = redisClient.isReady;
+  const healthy = mongoReady && redisReady;
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'unavailable',
+    mongo: mongoReady,
+    redis: redisReady,
+    uptime: process.uptime(),
+  });
+});
 
 // Server-side session (Redis-backed). The browser only holds the signed cookie;
 // OIDC tokens live in Redis, never in JS.

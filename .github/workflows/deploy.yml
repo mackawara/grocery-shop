@@ -1,0 +1,85 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing image tag to deploy (e.g. a previous commit SHA). Skips the build — use for rollback.'
+        required: false
+        type: string
+
+# Never run two deploys at once; queue instead of cancelling so a deploy is
+# never killed mid-flight.
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    # Skipped when a tag is supplied manually — that image already exists.
+    if: ${{ !inputs.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      - run: yarn lint
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/grocery-shop-api:${{ github.sha }}
+            ${{ vars.DOCKERHUB_USERNAME }}/grocery-shop-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    # Run after a successful build, or straight away when the build was
+    # skipped because an existing tag was supplied.
+    if: ${{ !cancelled() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/grocery-shop' }}
+      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/grocery-shop-api
+      TAG: ${{ inputs.tag || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync deploy files
+        run: |
+          rsync -az --delete \
+            --exclude '.env' --exclude 'api.env' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            deploy/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${DEPLOY_PATH}/"
+
+      - name: Deploy (health-gated, auto-rollback)
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "bash ${DEPLOY_PATH}/deploy.sh api '${IMAGE}' '${TAG}'"
