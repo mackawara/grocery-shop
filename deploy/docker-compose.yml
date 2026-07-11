@@ -1,5 +1,5 @@
 # Production stack: API + Redis + Dashboard. Lives in the repo under deploy/
-# and is rsynced to the server (default /opt/grocery-shop) by the API deploy
+# and is rsynced to the server (default /home/ubuntu/repos/saas) by the API deploy
 # workflow. Host Caddy terminates TLS and proxies to the loopback ports.
 #
 # Interpolation values (images, tags, ports) come from ./.env — managed by

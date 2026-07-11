@@ -9,6 +9,11 @@ on:
         description: 'Existing image tag to deploy (e.g. a previous commit SHA). Skips the build — use for rollback.'
         required: false
         type: string
+      skip_env_check:
+        description: 'Skip the required-secret check for api.env. For manually testing SSH/rsync/deploy.sh before all app secrets are set — the API container will still fail its healthcheck without them. Never applies to automatic pushes to main.'
+        required: false
+        type: boolean
+        default: false
 
 # Never run two deploys at once; queue instead of cancelling so a deploy is
 # never killed mid-flight.
@@ -59,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/grocery-shop' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/home/ubuntu/repos/saas' }}
       IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/grocery-shop-api
       TAG: ${{ inputs.tag || github.sha }}
     steps:
@@ -71,6 +76,91 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      # Builds api.env from individual GitHub secrets (source of truth for
+      # rotation — update one secret, redeploy) rather than a hand-maintained
+      # file on the server. Values pass through env: (process environment),
+      # never substituted as literal text into the script, so a secret
+      # containing $, `, or " can't be misinterpreted by the shell.
+      #
+      # Fails before ever touching the server if a mandatory value is empty —
+      # deploy.sh's rollback re-reads this same file, so a broken api.env
+      # would take down the rollback too, not just the new deploy.
+      - name: Write api.env from secrets
+        env:
+          SKIP_ENV_CHECK: ${{ inputs.skip_env_check }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: ${{ secrets.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_SYSTEM_TOKEN: ${{ secrets.WHATSAPP_SYSTEM_TOKEN }}
+          WHATSAPP_FLOW_PRIVATE_KEY: ${{ secrets.WHATSAPP_FLOW_PRIVATE_KEY }}
+          WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: ${{ secrets.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          AUTHENTIK_ISSUER: ${{ secrets.AUTHENTIK_ISSUER }}
+          AUTHENTIK_CLIENT_ID: ${{ secrets.AUTHENTIK_CLIENT_ID }}
+          AUTHENTIK_CLIENT_SECRET: ${{ secrets.AUTHENTIK_CLIENT_SECRET }}
+          AUTHENTIK_BASE_URL: ${{ secrets.AUTHENTIK_BASE_URL }}
+          AUTHENTIK_ADMIN_TOKEN: ${{ secrets.AUTHENTIK_ADMIN_TOKEN }}
+          AUTHENTIK_RECOVERY_EMAIL_STAGE: ${{ secrets.AUTHENTIK_RECOVERY_EMAIL_STAGE }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          PLATFORM_ADMIN_EMAILS: ${{ secrets.PLATFORM_ADMIN_EMAILS }}
+        run: |
+          if [ "${SKIP_ENV_CHECK}" = "true" ]; then
+            echo "::warning::skip_env_check is set — writing api.env without validating required secrets. Missing values will be blank; the API container will fail its healthcheck until real secrets are set. Use only to test SSH/rsync/deploy.sh." >&2
+          else
+            # Mandatory per src/config.ts's mandatoryEnvironmentConstants.
+            for key in MONGODB_USERNAME MONGODB_PASSWORD MONGODB_HOST \
+              WHATSAPP_WEBHOOK_VERIFICATION_TOKEN WHATSAPP_PHONE_NUMBER_ID \
+              WHATSAPP_SYSTEM_TOKEN WHATSAPP_FLOW_PRIVATE_KEY PUBLIC_BASE_URL \
+              AUTHENTIK_ISSUER AUTHENTIK_CLIENT_ID AUTHENTIK_CLIENT_SECRET \
+              AUTHENTIK_BASE_URL AUTHENTIK_ADMIN_TOKEN SESSION_SECRET DASHBOARD_URL; do
+              if [ -z "${!key}" ]; then
+                echo "::error::Missing required secret ${key} — see deploy/README.md (or re-run with skip_env_check to test SSH/rsync/deploy.sh only)" >&2
+                exit 1
+              fi
+            done
+          fi
+
+          umask 077
+          {
+            # PORT/REDIS_HOST are injected by docker-compose.yml directly —
+            # never set them here. REDIS_HOST_PORT is fixed by the redis:7
+            # image's default port, not a secret.
+            echo "APP_ENV=production"
+            echo "REDIS_HOST_PORT=6379"
+            echo "MONGODB_USERNAME=${MONGODB_USERNAME}"
+            echo "MONGODB_PASSWORD=${MONGODB_PASSWORD}"
+            echo "MONGODB_HOST=${MONGODB_HOST}"
+            echo "WHATSAPP_WEBHOOK_VERIFICATION_TOKEN=${WHATSAPP_WEBHOOK_VERIFICATION_TOKEN}"
+            echo "WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}"
+            echo "WHATSAPP_SYSTEM_TOKEN=${WHATSAPP_SYSTEM_TOKEN}"
+            echo "WHATSAPP_FLOW_PRIVATE_KEY=${WHATSAPP_FLOW_PRIVATE_KEY}"
+            echo "WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE=${WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE}"
+            echo "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}"
+            echo "AUTHENTIK_ISSUER=${AUTHENTIK_ISSUER}"
+            echo "AUTHENTIK_CLIENT_ID=${AUTHENTIK_CLIENT_ID}"
+            echo "AUTHENTIK_CLIENT_SECRET=${AUTHENTIK_CLIENT_SECRET}"
+            echo "AUTHENTIK_BASE_URL=${AUTHENTIK_BASE_URL}"
+            echo "AUTHENTIK_ADMIN_TOKEN=${AUTHENTIK_ADMIN_TOKEN}"
+            echo "AUTHENTIK_RECOVERY_EMAIL_STAGE=${AUTHENTIK_RECOVERY_EMAIL_STAGE}"
+            echo "SESSION_SECRET=${SESSION_SECRET}"
+            echo "DASHBOARD_URL=${DASHBOARD_URL}"
+            echo "GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}"
+            echo "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}"
+            echo "GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}"
+            echo "PLATFORM_ADMIN_EMAILS=${PLATFORM_ADMIN_EMAILS}"
+          } > /tmp/api.env
+          chmod 600 /tmp/api.env
+
+          scp -i ~/.ssh/deploy_key /tmp/api.env \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${DEPLOY_PATH}/api.env"
+          rm -f /tmp/api.env
 
       - name: Sync deploy files
         run: |
