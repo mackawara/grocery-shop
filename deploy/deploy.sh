@@ -31,7 +31,7 @@ esac
 cd "$(dirname "$0")"
 
 if [ ! -f api.env ]; then
-  echo "ERROR: api.env not found — create the app env file on the server first (see README.md)." >&2
+  echo "ERROR: api.env not found — the deploy workflow writes it from GitHub secrets before calling this script (see README.md); it should never be missing." >&2
   exit 1
 fi
 
