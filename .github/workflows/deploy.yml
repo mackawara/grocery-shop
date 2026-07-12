@@ -25,7 +25,9 @@ jobs:
   build-and-push:
     # Skipped when a tag is supplied manually — that image already exists.
     if: ${{ !inputs.tag }}
-    runs-on: ubuntu-latest
+    # ARM runner: the deploy target is an arm64 server, so the image must be
+    # built for linux/arm64.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
