@@ -92,6 +92,7 @@ jobs:
         env:
           SKIP_ENV_CHECK: ${{ inputs.skip_env_check }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          PORT: ${{ secrets.PORT }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           WHATSAPP_WEBHOOK_VERIFICATION_TOKEN: ${{ secrets.WHATSAPP_WEBHOOK_VERIFICATION_TOKEN }}
