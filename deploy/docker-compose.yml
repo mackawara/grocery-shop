@@ -14,16 +14,16 @@ services:
     environment:
       # Keep the app's listen port and the published port in lockstep, and
       # point it at the redis service on the compose network.
-      - PORT=${PORT:-4000}
+      - PORT=${PORT:-5000}
       - REDIS_HOST=redis
     ports:
       # Loopback only — Caddy proxies api.<domain> here.
-      - '127.0.0.1:${PORT:-4000}:${PORT:-4000}'
+      - '127.0.0.1:${PORT:-5000}:${PORT:-5000}'
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:${PORT:-4000}/health']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:${PORT:-5000}/health']
       interval: 10s
       timeout: 5s
       retries: 5

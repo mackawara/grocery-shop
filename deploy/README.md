@@ -11,7 +11,7 @@ step, not because it's hand-maintained.
 
 | App       | Image                    | Loopback port | Deployed by                      |
 | --------- | ------------------------ | ------------- | -------------------------------- |
-| API       | `<user>/grocery-shop-api` | `4000`        | grocery-shop `Deploy API`        |
+| API       | `<user>/grocery-shop-api` | `5000`        | grocery-shop `Deploy API`        |
 | Dashboard | `<user>/grocery-dashboard`| `8080`        | grocery-DASHBOARD `Deploy Dashboard` |
 
 Both pipelines: build → push to Docker Hub (tagged `latest` + git SHA) → SSH →
@@ -41,7 +41,7 @@ it) — changing the API URL requires a rebuild, not a restart.
 
    ```caddy
    api.ventatech.duckdns.org {
-       reverse_proxy 127.0.0.1:4000
+       reverse_proxy 127.0.0.1:5000
    }
 
    dashboard.ventatech.duckdns.org {
