@@ -71,7 +71,7 @@ const publicBaseUrl =
 
 export const CONFIG = {
   IS_LOCAL_ENVIRONMENT: isLocal,
-  PORT: parseInt(process.env.PORT || '0', 10) || 4000,
+  PORT: parseInt(process.env.PORT || '0', 10) || 5000,
   REDIS_HOST_PORT: process.env.REDIS_HOST_PORT ? parseInt(process.env.REDIS_HOST_PORT) : 6379,
   REDIS_HOST: process.env.REDIS_HOST || 'localhost',
   REDIS_CONNECT_TIMEOUT: parseInt(process.env.REDIS_CONNECT_TIMEOUT || '0', 10) || 90000,
