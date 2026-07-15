@@ -106,8 +106,18 @@ const uploadImage = multer({
 
 router.post(PRODUCTS, ...catalogWrite, createProductHandler);
 router.get(PRODUCTS, ...catalog, listProductsHandler);
-router.post(`${PRODUCTS}/import`, ...catalogWrite, uploadFeed.single('file'), importProductsHandler);
-router.post(`${PRODUCTS}/image`, ...catalogWrite, uploadImage.single('file'), uploadProductImageHandler);
+router.post(
+  `${PRODUCTS}/import`,
+  ...catalogWrite,
+  uploadFeed.single('file'),
+  importProductsHandler,
+);
+router.post(
+  `${PRODUCTS}/image`,
+  ...catalogWrite,
+  uploadImage.single('file'),
+  uploadProductImageHandler,
+);
 router.get(`${PRODUCTS}/:productId`, ...catalog, getProductHandler);
 router.patch(`${PRODUCTS}/:productId`, ...catalogWrite, updateProductHandler);
 router.post(`${PRODUCTS}/:productId/publish`, ...catalogWrite, publishProductHandler);

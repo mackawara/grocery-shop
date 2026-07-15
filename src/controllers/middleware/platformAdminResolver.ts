@@ -3,15 +3,11 @@ import type { Types } from 'mongoose';
 import PlatformUser from '../../models/PlatformUser.ts';
 import type { IPlatformUser } from '../../models/PlatformUser.ts';
 import { PlatformRole, PlatformUserStatus } from '../../constants/models.ts';
-import { CONFIG } from '../../config.ts';
+import { isAllowlistedAdmin } from '../../services/platformMembership.ts';
+import { resolveMembership } from '../../services/vendorMembership.ts';
 import { logger } from '../../services/logger.ts';
 
 const TAG = '[platformAdminResolver]';
-
-// Break-glass bootstrap: a verified, allowlisted email is always an active super
-// admin, independent of any DB row (so an empty PlatformUser collection can't
-// lock everyone out). Built from env at module load.
-const ALLOWLISTED_ADMIN_EMAILS = new Set(CONFIG.PLATFORM_ADMIN_EMAILS);
 
 // What downstream admin handlers read off res.locals.
 export interface PlatformActor {
@@ -20,24 +16,20 @@ export interface PlatformActor {
   role: string;
 }
 
-// Resolve (and on first login, bind) the PlatformUser. Matches by authSubject;
-// on first login the row was seeded with no subject, so we fall back to the
-// email anchor and bind sub. Returns null when the identity isn't a platform
-// user, is disabled, or the email row is already bound to a different subject.
-// PlatformUser is not tenant-scoped, so these run without any tenant context.
+// Resolve (and on first login, bind) the PlatformUser. Matching is delegated to
+// resolveMembership — the same rule the auth callback uses for session typing —
+// so the two can never disagree: authSubject first, verified-email anchor
+// fallback, refuse a row already bound to a different subject. Returns null
+// when the identity isn't a platform user or is disabled. PlatformUser is not
+// tenant-scoped, so these run without any tenant context.
 const resolvePlatformUser = async (
   sub: string,
   email: string | undefined,
+  emailVerified: boolean,
 ): Promise<IPlatformUser | null> => {
-  let admin = await PlatformUser.findOne({ authSubject: sub });
-
-  if (!admin && email) {
-    const byEmail = await PlatformUser.findOne({ email });
-    if (byEmail && byEmail.authSubject && byEmail.authSubject !== sub) {
-      return null;
-    }
-    admin = byEmail;
-  }
+  const admin = await resolveMembership(sub, email, emailVerified, (filter) =>
+    PlatformUser.findOne(filter).exec(),
+  );
 
   if (!admin || admin.status === PlatformUserStatus.DISABLED) {
     return null;
@@ -94,14 +86,14 @@ export const platformAdminResolver = async (
   // A verified, allowlisted email is authoritative; otherwise fall back to a
   // DB-managed PlatformUser. Allowlist requires email_verified so an unverified
   // claim can't impersonate an allowlisted address.
-  const allowlisted = emailVerified && Boolean(email) && ALLOWLISTED_ADMIN_EMAILS.has(email ?? '');
+  const allowlisted = isAllowlistedAdmin(email, emailVerified);
 
   let admin: IPlatformUser | null;
   try {
     admin =
       allowlisted && email
         ? await ensureAllowlistedAdmin(sub, email)
-        : await resolvePlatformUser(sub, email);
+        : await resolvePlatformUser(sub, email, emailVerified);
   } catch (err) {
     logger.error(`${TAG} platform user lookup failed: ${err instanceof Error ? err.message : err}`);
     res.status(500).json({ error: 'Authentication failed.' });
