@@ -4,6 +4,7 @@ import { CONFIG } from '../../config.ts';
 import VendorUser from '../../models/VendorUser.ts';
 import { runWithoutTenant } from '../../context/tenantContext.ts';
 import { resolveMembership } from '../../services/vendorMembership.ts';
+import { checkPlatformAdmin } from '../../services/platformMembership.ts';
 import { client, getOidcConfig } from '../../services/authentikOidc.ts';
 import { logger } from '../../services/logger.ts';
 
@@ -90,17 +91,13 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   const sub = claims.sub;
   const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : undefined;
   const emailVerified = claims.email_verified === true;
-  const groups = Array.isArray(claims.groups)
-    ? claims.groups.filter((g): g is string => typeof g === 'string')
-    : [];
   const expiresIn = tokens.expiresIn();
 
-  // Tenant membership is authoritative in our DB, not in the token: Authentik
-  // asserts *who* this identity is; the VendorUser row asserts *which tenant*
+  // What this identity may do is authoritative in our DB, not in the token:
+  // Authentik asserts *who* they are; the VendorUser row asserts *which tenant*
   // they belong to (and dashboardAuthResolver re-checks it on every request).
   // The tenant is unknown until the row is found, so this is a sanctioned
-  // cross-tenant read. No row means no vendor seat (e.g. a platform admin),
-  // which falls through to the /console landing below.
+  // cross-tenant read.
   const membership = await runWithoutTenant(
     'oidc-callback vendor membership resolution',
     'VendorUser.findOne({ authSubject }) / findOne({ email })',
@@ -111,6 +108,12 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   );
   const tenantId = membership ? membership.tenantId.toString() : undefined;
 
+  // Platform-admin capability likewise comes from the DB (PlatformUser row or
+  // break-glass allowlist) — PlatformUser is not tenant-scoped, so no bypass is
+  // needed. Both capabilities are kept so a dual-seat identity can reach both
+  // areas; platformAdminResolver re-verifies on every /admin request.
+  const isPlatformAdmin = await checkPlatformAdmin(sub, email, emailVerified);
+
   // Regenerate the session id once the identity is established (defeats session
   // fixation), then persist the identity + tokens server-side.
   req.session.regenerate((regenErr) => {
@@ -120,7 +123,14 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    req.session.auth = { sub, email, emailVerified, tenantId, groups };
+    req.session.auth = {
+      sub,
+      email,
+      emailVerified,
+      tenantId,
+      isVendor: Boolean(membership),
+      isPlatformAdmin,
+    };
     req.session.tokens = {
       idToken: tokens.id_token,
       accessToken: tokens.access_token,
@@ -134,10 +144,11 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
         res.status(500).send('Could not complete sign-in. Please try again.');
         return;
       }
-      // Land somewhere that works for who they are: vendors (tenant_id claim)
-      // get the dashboard; identities with no tenant (platform admins) get the
-      // admin console, which has its own session guard.
-      const landingPath = tenantId ? '/dashboard' : '/console';
+      // Land where their seat works: a vendor seat wins (the day-to-day
+      // surface — dual-seat identities can still navigate to the console),
+      // platform admins without one get the console, and a seatless identity
+      // gets a dead-end explainer rather than a route that will just 403.
+      const landingPath = membership ? '/dashboard' : isPlatformAdmin ? '/console' : '/no-access';
       res.redirect(new URL(landingPath, CONFIG.DASHBOARD_URL).href);
     });
   });

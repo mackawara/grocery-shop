@@ -50,6 +50,33 @@ Boot order (`src/index.ts`): connect Redis (with timeout) → start HTTP server 
 
 ---
 
+## Infrastructure & deployment
+
+**The API and the Vendor Dashboard run on the same server**, as Docker containers
+in one compose stack (`deploy/docker-compose.yml`). A host-installed **Caddy**
+terminates TLS and reverse-proxies each subdomain to a loopback-only port:
+
+- `api.<domain>` → `127.0.0.1:5000` (this API)
+- `dashboard.<domain>` → `127.0.0.1:8080` (grocery-DASHBOARD)
+
+Redis lives in the same stack, reachable only on the compose network. Deploys are
+per-service GitHub Actions workflows (build → Docker Hub → SSH → health-gated
+restart with automatic rollback); `api.env` is regenerated from GitHub secrets on
+every API deploy. Full details in `deploy/README.md`.
+
+Implications when developing:
+
+- The API and dashboard are co-located on sibling subdomains behind one Caddy —
+  CORS, cookie/session settings, and redirect URLs can assume this topology.
+- A new publicly reachable endpoint or hostname only needs a Caddy route +
+  compose port mapping — no new infrastructure.
+- Containers publish **loopback-only** ports; never publish a port on `0.0.0.0`
+  in the production compose file — Caddy is the sole public entry point.
+- A new required env var must also be added to the deploy workflow's `api.env`
+  generation (see `deploy/README.md` → Application secrets), or deploys fail.
+
+---
+
 ## Tenant isolation — how it works
 
 This is the most important system in the codebase. Three layers, all keyed off an

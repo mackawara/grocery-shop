@@ -1,15 +1,24 @@
 // Identity established at login (from the validated ID token) and kept in the
 // session. The dashboard/admin resolvers read this instead of re-verifying a
-// bearer token per request. Deliberately minimal — claims only, no DB rows.
+// bearer token per request.
+//
+// The capability flags are derived from OUR DB at login (VendorUser /
+// PlatformUser) — Authentik asserts identity only, it carries no role or group
+// claims. Both flags can be true for a dual-seat identity. They drive routing
+// and UX only; dashboardAuthResolver and platformAdminResolver re-verify the
+// underlying rows on every request, so a stale flag can never authorize.
 export interface SessionAuth {
   sub: string;
   email?: string;
   // email_verified claim — required before an email may be trusted for the
   // platform-admin allowlist (see platformAdminResolver).
   emailVerified: boolean;
-  // tenant_id claim — present for vendor identities, absent for platform admins.
+  // Tenant of the VendorUser seat — present iff isVendor.
   tenantId?: string;
-  groups: string[];
+  // Holds a VendorUser seat (tenant vendor dashboard).
+  isVendor: boolean;
+  // Active PlatformUser super admin, or break-glass allowlisted email.
+  isPlatformAdmin: boolean;
 }
 
 // OAuth state stashed between /auth/login and /auth/callback: CSRF (state),
