@@ -5,8 +5,7 @@ import DeliveryAddressModel from '../../models/DeliveryAddress.ts';
 import Tenant from '../../models/Tenant.ts';
 import { getTenantId } from '../../context/tenantContext.ts';
 import { getRedisHashValue, setRedisHashKeyValuePair } from '../redis/redis.controller.ts';
-import { haversineKm } from '../../utils/geo.ts';
-import { initiateOrderPayment } from '../payments/payment.controller.ts';
+import { quoteAndConfirmDelivery } from './deliveryQuote.controller.ts';
 
 const TAG = '[DELIVERY_FLOW]';
 
@@ -99,14 +98,6 @@ export const handleDeliveryLocation = async (
 
     await DeliveryAddressModel.updateOne({ _id: addressId }, { $set: { location_gps: gps } });
 
-    // Distance from tenant shop — informational only; drives the future
-    // geofence/zone work. No enforcement yet.
-    const tenant = await Tenant.findById(getTenantId()).select('location_gps').lean();
-    if (tenant?.location_gps?.latitude && tenant?.location_gps?.longitude) {
-      const km = haversineKm(tenant.location_gps, gps);
-      logger.info(`${TAG} Order ${orderNumber} is ${km.toFixed(2)}km from shop`);
-    }
-
     // Intentionally leave STATE_KEY in place — its TTL acts as the "you can
     // still correct the pin" window (~30 min).
 
@@ -116,8 +107,15 @@ export const handleDeliveryLocation = async (
       `Got it! We've saved your delivery location for order ${orderNumber}.\n\nWrong location? Just send a new pin to update it.`,
     );
 
-    // Address is fully sorted (typed fields + GPS) — now collect payment.
-    await initiateOrderPayment(from, orderNumber);
+    // Address is fully sorted (typed fields + GPS) — price the delivery and
+    // ask the customer to confirm the new total. Payment is initiated by the
+    // quote flow (after the confirm tap), not here.
+    const tenant = await Tenant.findById(getTenantId()).select('location_gps').lean();
+    const shopOrigin =
+      tenant?.location_gps?.latitude != null && tenant?.location_gps?.longitude != null
+        ? { latitude: tenant.location_gps.latitude, longitude: tenant.location_gps.longitude }
+        : undefined;
+    await quoteAndConfirmDelivery(from, orderNumber, shopOrigin, gps);
   } catch (error) {
     logger.error(`${TAG} Error handling delivery location from ${from}: ${error}`);
 

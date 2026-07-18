@@ -5,7 +5,22 @@
 // Order): everything it needs arrives as tenantId + plain DTOs. That boundary is
 // what would let this move to its own API without untangling business logic.
 
-export type { GeoPoint, Money, VehicleRequirement, VehicleCapacity } from './types.ts';
+export type {
+  GeoPoint,
+  Money,
+  VehicleRequirement,
+  VehicleCapacity,
+  CartItemPhysicals,
+} from './types.ts';
+
+// Quote engine
+export {
+  quoteDelivery,
+  computeVehicleRequirement,
+  QuoteStatus,
+  VOLUMETRIC_DIVISOR_CM3_PER_KG,
+} from './quote.service.ts';
+export type { DeliveryQuote, DeliveryQuoteFailure, DeliveryQuoteResult } from './quote.service.ts';
 
 // Rate matrix
 export {
@@ -39,6 +54,7 @@ export {
   updateVehicle,
   deleteVehicle,
   selectVehicle,
+  listFittingVehicles,
 } from './vehicle.service.ts';
 export type { VehicleInput } from './vehicle.service.ts';
 export { default as Vehicle, VehicleTier } from './models/Vehicle.ts';

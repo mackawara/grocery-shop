@@ -5,7 +5,12 @@ import {
   signupVerify,
   getMe,
   inviteVendorUser,
+  revokeInvitation,
+  resendInvitation,
+  removeStaff,
   listTeam,
+  activationStart,
+  activationVerify,
 } from '../controllers/dashboard/vendor.controller.ts';
 import {
   createProductHandler,
@@ -32,8 +37,15 @@ import {
   upsertRateHandler,
   deleteRateHandler,
 } from '../controllers/delivery/deliveryConfig.controller.ts';
+import {
+  listOrdersHandler,
+  getOrderHandler,
+  assignDriverHandler,
+  navCountsHandler,
+} from '../controllers/dashboard/orders.controller.ts';
 import { rateLimit } from '../controllers/middleware/rateLimit.ts';
 import { dashboardAuthResolver } from '../controllers/middleware/dashboardAuthResolver.ts';
+import { activationResolver } from '../controllers/middleware/activationResolver.ts';
 import { requireRole } from '../controllers/middleware/requireRole.ts';
 import { UserRole } from '../constants/models.ts';
 import { normalizePhone } from '../utils/phone.ts';
@@ -63,6 +75,15 @@ router.post('/signup/verify', byIp('signup-verify'), byPhone('signup-verify'), s
 router.get('/me', dashboardAuthResolver, getMe);
 router.get('/team', dashboardAuthResolver, listTeam);
 router.post('/invitations', dashboardAuthResolver, inviteVendorUser);
+router.post('/invitations/:id/resend', dashboardAuthResolver, resendInvitation);
+router.delete('/invitations/:id', dashboardAuthResolver, revokeInvitation);
+router.delete('/team/:id', dashboardAuthResolver, removeStaff);
+
+// First-login activation for invited staff. Behind activationResolver (admits
+// only an invited-but-unverified seat), not dashboardAuthResolver (which bounces
+// them). Rate-limited per IP to blunt OTP-bombing; the OTP service adds attempt caps.
+router.post('/activate/start', byIp('activate'), activationResolver, activationStart);
+router.post('/activate/verify', byIp('activate'), activationResolver, activationVerify);
 
 // Catalog CRUD. Session-scoped: dashboardAuthResolver establishes the tenant
 // from the session (res.locals.actor.tenantId) and runs the handler inside
@@ -148,5 +169,14 @@ router.delete('/vehicles/:id', ...configWrite, deleteVehicleHandler);
 router.get('/rates', ...config, listRatesHandler);
 router.put('/rates', ...configWrite, upsertRateHandler);
 router.delete('/rates/:id', ...configWrite, deleteRateHandler);
+
+// Orders — reads open to any authenticated tenant member (a driver can see the
+// board); driver allocation is gated like the other operational writes.
+router.get('/orders', ...config, listOrdersHandler);
+router.get('/orders/:id', ...config, getOrderHandler);
+router.post('/orders/:id/assign-driver', ...configWrite, assignDriverHandler);
+
+// Sidebar badges (currently: unassigned delivery orders).
+router.get('/nav/counts', ...config, navCountsHandler);
 
 export default router;

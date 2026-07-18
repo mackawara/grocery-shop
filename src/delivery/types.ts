@@ -37,3 +37,14 @@ export interface VehicleCapacity {
   maxWeightKg: number;
   active: boolean;
 }
+
+// One order line's physical profile, as the host reads it off its own catalog.
+// Everything except quantity is optional: the platform quotes on available
+// data, so a missing weight/dimensions simply contributes nothing (delivery
+// readiness checks nudge vendors to fill physicals in).
+export interface CartItemPhysicals {
+  quantity: number;
+  weightKg?: number;
+  dimensionsCm?: { length: number; width: number; height: number };
+  minTier?: VehicleTier;
+}

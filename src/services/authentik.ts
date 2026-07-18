@@ -128,6 +128,18 @@ const addUserToGroup = async (groupPk: string, userPk: number): Promise<void> =>
   }
 };
 
+// Enable or disable an Authentik user (PATCH is_active). Disabling locks them
+// out of the IdP immediately — used when a vendor removes an active teammate
+// (the VendorUser row is set DISABLED in parallel). Reversible, unlike deleteUser.
+const setUserActive = async (userPk: number, active: boolean): Promise<void> => {
+  try {
+    await client.patch(`/core/users/${userPk}/`, { is_active: active });
+    logger.info(`${TAG} set user pk ${userPk} is_active=${active}`);
+  } catch (err) {
+    throw toAuthentikError('setUserActive', err);
+  }
+};
+
 // Generate a one-time recovery link the vendor follows to set their password
 // and verify their email. Returns the absolute link Authentik issues.
 const createRecoveryLink = async (userPk: number): Promise<string> => {
@@ -199,6 +211,7 @@ export const authentik = {
   createGroup,
   createUser,
   addUserToGroup,
+  setUserActive,
   createRecoveryLink,
   sendRecoveryEmail,
   findUserByEmail,
