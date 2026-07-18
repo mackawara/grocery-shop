@@ -30,6 +30,13 @@ export interface IVendorUser extends Document {
   name?: string;
   role: UserRole;
   status: VendorUserStatus;
+  // Proof that the person controls `phoneNumber`, established via WhatsApp OTP.
+  // The owner sets this true at signup (they verify the OTP before the row is
+  // created); invited staff start false and flip it true when they pass the
+  // first-login activation OTP. The dashboard auth resolver refuses to activate
+  // an INVITED seat until this is true (owners are treated as verified by
+  // construction — see resolveVendorUser).
+  phoneVerified: boolean;
   lastLoginAt?: Date;
 }
 
@@ -52,18 +59,25 @@ const VendorUserSchema = new Schema<IVendorUser>(
       default: VendorUserStatus.INVITED,
       index: true,
     },
+    phoneVerified: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
   },
   { timestamps: true },
 );
 
 // Natural keys, all scoped to the tenant. phoneNumber is the first-line login
-// identifier; email is the anchor/recovery field; authSubject is sparse because
-// it is absent until first login (and unique only among the docs that have it,
-// so multiple INVITED rows without a subject coexist).
+// identifier; email is the anchor/recovery field; authSubject is unique only
+// among docs that actually have one, so multiple INVITED rows without a subject
+// coexist. This must be a partial index, not sparse: a compound sparse index
+// still indexes any doc with at least one of the fields present, and tenantId
+// always is — so sparse would key every INVITED row as authSubject: null and
+// E11000 on the second invite per tenant.
 VendorUserSchema.index({ tenantId: 1, phoneNumber: 1 }, { unique: true });
 VendorUserSchema.index({ tenantId: 1, email: 1 }, { unique: true });
-VendorUserSchema.index({ tenantId: 1, authSubject: 1 }, { unique: true, sparse: true });
+VendorUserSchema.index(
+  { tenantId: 1, authSubject: 1 },
+  { unique: true, partialFilterExpression: { authSubject: { $type: 'string' } } },
+);
 
 // Global login-lookup keys. The dashboard login path resolves a tenant from the
 // identity alone (see resolveMembership), before any tenant context exists, so

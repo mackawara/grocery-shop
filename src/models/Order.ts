@@ -1,7 +1,14 @@
 // TODO: Stub model — extend with delivery address, discount, and channel fields before production use
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import { OrderStatus, PaymentStatus, DeliveryStatus } from '../constants/models.ts';
+import {
+  OrderStatus,
+  PaymentStatus,
+  DeliveryStatus,
+  QuoteStatus,
+  VehicleTier,
+  Currency,
+} from '../constants/models.ts';
 import { tenantScope } from './plugins/tenantScope.ts';
 
 export { OrderStatus, PaymentStatus, DeliveryStatus };
@@ -30,6 +37,23 @@ export interface IOrder extends Document {
     address?: Types.ObjectId;
     status: DeliveryStatus;
     expectedDeliveryDate?: Date;
+    // --- Delivery quote (written at GPS-pin time by the quote flow). The fee
+    // is the source of truth in minor units; it is folded into `totalAmount`
+    // (major units) only once the customer confirms — `feeApplied` is the
+    // idempotency latch for that fold.
+    quoteStatus?: QuoteStatus;
+    fee?: { amount: number; currency: Currency };
+    feeApplied?: boolean;
+    vehicleTier?: VehicleTier;
+    distanceKm?: number;
+    // Driver allocation, made by the shop on the dashboard. `driver` refs a
+    // VendorUser with role DRIVER; the name is snapshotted so the order's
+    // history stays legible even if the seat is later renamed/removed.
+    assignment?: {
+      driver: Types.ObjectId;
+      driverNameSnapshot?: string;
+      assignedAt: Date;
+    };
   };
 }
 
@@ -63,6 +87,37 @@ const OrderSchema = new Schema<IOrder>(
         default: DeliveryStatus.PENDING,
       },
       expectedDeliveryDate: { type: Date },
+      quoteStatus: { type: String, enum: Object.values(QuoteStatus) },
+      fee: {
+        type: new Schema(
+          {
+            amount: {
+              type: Number,
+              required: true,
+              min: 0,
+              validate: {
+                validator: Number.isInteger,
+                message: 'fee amount must be an integer in minor units (e.g. cents)',
+              },
+            },
+            currency: { type: String, required: true, enum: Object.values(Currency) },
+          },
+          { _id: false },
+        ),
+      },
+      feeApplied: { type: Boolean },
+      vehicleTier: { type: String, enum: Object.values(VehicleTier) },
+      distanceKm: { type: Number, min: 0 },
+      assignment: {
+        type: new Schema(
+          {
+            driver: { type: Schema.Types.ObjectId, ref: 'VendorUser', required: true },
+            driverNameSnapshot: { type: String, trim: true },
+            assignedAt: { type: Date, required: true },
+          },
+          { _id: false },
+        ),
+      },
     },
   },
   { timestamps: true },

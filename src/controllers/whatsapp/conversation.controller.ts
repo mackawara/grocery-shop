@@ -7,6 +7,14 @@ import { orderFlowHandler } from './orderFlowHandler.ts';
 import { handleDeliveryLocation } from '../delivery/deliveryFlowHandler.ts';
 import { initiateOrderPayment } from '../payments/payment.controller.ts';
 import { parsePaymentRetryButtonId } from '../../constants/payments.ts';
+import {
+  parseDeliveryConfirmButtonId,
+  parseDeliveryCollectButtonId,
+} from '../../constants/delivery.ts';
+import {
+  handleDeliveryQuoteConfirm,
+  handleDeliverySwitchToCollect,
+} from '../delivery/deliveryQuote.controller.ts';
 import whatsappMessager from './outgoingMessages.ts';
 import type {
   Text,
@@ -46,6 +54,18 @@ const buttonReplyHandler = async (
   const retryOrderNumber = parsePaymentRetryButtonId(button_reply.id);
   if (retryOrderNumber) {
     await initiateOrderPayment(from, retryOrderNumber);
+    return;
+  }
+
+  // Delivery-quote taps — the orderNumber rides in the button id.
+  const confirmOrderNumber = parseDeliveryConfirmButtonId(button_reply.id);
+  if (confirmOrderNumber) {
+    await handleDeliveryQuoteConfirm(from, confirmOrderNumber);
+    return;
+  }
+  const collectOrderNumber = parseDeliveryCollectButtonId(button_reply.id);
+  if (collectOrderNumber) {
+    await handleDeliverySwitchToCollect(from, collectOrderNumber);
     return;
   }
 
