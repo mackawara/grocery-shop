@@ -108,6 +108,20 @@ export enum DeliveryZoneKind {
   POLYGON = 'polygon',
 }
 
+// Outcome of a delivery quote (shared kernel: produced by the delivery module,
+// persisted on Order by the host):
+//  QUOTED      — a fee was computed (zone + vehicle + rate all resolved).
+//  OUT_OF_AREA — the drop-off pin falls in no active zone.
+//  NO_VEHICLE  — no active vehicle in the fleet can carry the cart.
+//  NOT_SERVED  — a vehicle fits, but no rate cell prices any fitting tier
+//                into the zone (missing cell or explicit not_served).
+export enum QuoteStatus {
+  QUOTED = 'quoted',
+  OUT_OF_AREA = 'out_of_area',
+  NO_VEHICLE = 'no_vehicle',
+  NOT_SERVED = 'not_served',
+}
+
 // Currencies the platform accepts, as ISO-4217 codes. NOTE: Zimbabwe Gold (ZiG)
 // is code `ZWG`. Meta's catalog may not accept all of these — validate there.
 export enum Currency {
@@ -127,6 +141,10 @@ export enum UserRole {
   VENDOR = 'vendor',
   SHOP_MANAGER = 'shop_manager',
   SALES_REP = 'sales_rep',
+  // Delivery staff: assignable to orders on the dashboard. A driver is a
+  // regular (invitable) VendorUser seat, so the same invitation/activation
+  // machinery applies.
+  DRIVER = 'driver',
   CUSTOMER = 'customer',
 }
 

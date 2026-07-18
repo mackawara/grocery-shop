@@ -55,20 +55,28 @@ export const deleteVehicle = (tenantId: string, id: string): Promise<boolean> =>
   });
 
 /**
- * Pick the smallest vehicle that can carry a cart: active, tier at least the
- * cart's minimum-vehicle floor, and enough weight capacity. Pure and generic so
- * it works on hydrated docs or lean DTOs, and is trivially unit-testable.
- * Returns null when nothing in the fleet fits (caller decides: block or split).
+ * Every vehicle able to carry a cart — active, tier at least the cart's
+ * minimum-vehicle floor, enough weight capacity — ordered smallest → largest.
+ * Pure and generic so it works on hydrated docs or lean DTOs. The quote engine
+ * walks this list until it finds a tier the rate matrix actually prices.
  */
-export const selectVehicle = <T extends VehicleCapacity>(
+export const listFittingVehicles = <T extends VehicleCapacity>(
   vehicles: T[],
   requirement: VehicleRequirement,
-): T | null => {
+): T[] => {
   const minRank = requirement.minTier ? tierRank(requirement.minTier) : 0;
-  const fitting = vehicles
+  return vehicles
     .filter(
       (v) => v.active && tierRank(v.tier) >= minRank && v.maxWeightKg >= requirement.weightKg,
     )
     .sort((a, b) => tierRank(a.tier) - tierRank(b.tier));
-  return fitting[0] ?? null;
 };
+
+/**
+ * Pick the smallest vehicle that can carry a cart. Returns null when nothing
+ * in the fleet fits (caller decides: block or split).
+ */
+export const selectVehicle = <T extends VehicleCapacity>(
+  vehicles: T[],
+  requirement: VehicleRequirement,
+): T | null => listFittingVehicles(vehicles, requirement)[0] ?? null;

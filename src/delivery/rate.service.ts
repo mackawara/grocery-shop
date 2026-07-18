@@ -66,7 +66,9 @@ export const computeDeliveryFee = (rate: RatePricing, distanceKm: number): Money
       if (!rate.flat) {
         throw new Error('flat rate cell is missing its flat amount');
       }
-      return { ...rate.flat };
+      // Rebuild field-by-field: `rate` may be a hydrated doc, and spreading a
+      // Mongoose subdocument leaks its internals into what must be a plain DTO.
+      return { amount: rate.flat.amount, currency: rate.flat.currency };
     case DeliveryRateKind.BASE_PER_KM: {
       if (!rate.base || !rate.perKm) {
         throw new Error('base_per_km rate cell is missing base/perKm');

@@ -3,7 +3,7 @@ import type { Types } from 'mongoose';
 import Tenant from '../../models/Tenant.ts';
 import VendorUser from '../../models/VendorUser.ts';
 import type { IVendorUser } from '../../models/VendorUser.ts';
-import { TenantStatus, VendorUserStatus } from '../../constants/models.ts';
+import { TenantStatus, UserRole, VendorUserStatus } from '../../constants/models.ts';
 import { runWithTenant, runWithoutTenant } from '../../context/tenantContext.ts';
 import { resolveMembership } from '../../services/vendorMembership.ts';
 import { logger } from '../../services/logger.ts';
@@ -18,50 +18,69 @@ export interface DashboardActor {
   role: string;
 }
 
+// Outcome of resolving the acting VendorUser for a session identity:
+//  - ok               — a usable, active seat (bound); grant dashboard access.
+//  - needs_activation — an invited seat whose phone is not yet verified; the
+//                       first-login WhatsApp OTP gate must run before access.
+//  - denied           — no seat for this tenant, disabled, or email bound to a
+//                       different subject.
+export type VendorResolution =
+  | { kind: 'ok'; vendorUser: IVendorUser }
+  | { kind: 'needs_activation'; vendorUser: IVendorUser }
+  | { kind: 'denied' };
+
 // Resolve (and on first login, bind) the VendorUser for this identity. Applies
 // the shared membership rule (see resolveMembership) — subject first, then the
 // verified-email anchor on first login — with a tenant-scoped finder: we have
 // already established the session's tenant, so a stale session pointing at the
-// wrong tenant simply finds no row here and is denied (fails closed). Then
-// binds the subject + activates on first login. Returns null when the identity
-// isn't provisioned for this tenant, is disabled, or the email is bound to a
-// different subject. Runs inside runWithTenant (scoped).
-const resolveVendorUser = async (
+// wrong tenant simply finds no row here and is denied (fails closed). Binds the
+// subject and stamps lastLoginAt on every call. An INVITED seat activates only
+// once its phone is verified; otherwise it is held in `needs_activation` for the
+// OTP gate. Owners are verified by construction (they pass the signup OTP before
+// their row exists), so they never stall here even if the flag predates this
+// field. Runs inside runWithTenant (scoped).
+export const resolveVendorUser = async (
   sub: string,
   email: string | undefined,
   emailVerified: boolean,
-): Promise<IVendorUser | null> => {
+): Promise<VendorResolution> => {
   const vendorUser = await resolveMembership(sub, email, emailVerified, (filter) =>
     VendorUser.findOne(filter).exec(),
   );
 
   if (!vendorUser || vendorUser.status === VendorUserStatus.DISABLED) {
-    return null;
+    return { kind: 'denied' };
   }
 
   if (!vendorUser.authSubject) {
     vendorUser.authSubject = sub;
   }
+  vendorUser.lastLoginAt = new Date();
+
+  const phoneVerified = vendorUser.phoneVerified || vendorUser.role === UserRole.VENDOR;
+  if (vendorUser.status === VendorUserStatus.INVITED && !phoneVerified) {
+    await vendorUser.save();
+    return { kind: 'needs_activation', vendorUser };
+  }
   if (vendorUser.status === VendorUserStatus.INVITED) {
     vendorUser.status = VendorUserStatus.ACTIVE;
   }
-  vendorUser.lastLoginAt = new Date();
   await vendorUser.save();
 
-  return vendorUser;
+  return { kind: 'ok', vendorUser };
 };
 
-// Gate for all authenticated /dashboard routes. Reads the identity from the BFF
-// session (established at login), resolves the tenant from the tenant_id claim
-// (fail closed on status), binds the acting VendorUser, and runs the handler
-// inside the tenant context.
-export const dashboardAuthResolver = async (
+// Shared scaffolding for the authenticated dashboard middlewares. Reads the BFF
+// session identity, resolves the tenant from the tenant_id claim (fail closed on
+// status), then runs `handle` with the VendorResolution inside the tenant
+// context. Each caller decides how to treat each resolution kind — the standard
+// gate denies `needs_activation`, the activation gate is the one place that
+// admits it. Returns after `handle` has written the response (or called next()).
+export const withVendorSession = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  handle: (resolution: VendorResolution, tenant: InstanceType<typeof Tenant>) => void,
 ): Promise<void> => {
-  // Identity is established at login and read from the session — no per-request
-  // token verification.
   const auth = req.session.auth;
   if (!auth) {
     res.status(401).json({ error: 'Authentication required.' });
@@ -107,21 +126,39 @@ export const dashboardAuthResolver = async (
   await runWithTenant(
     tenant._id as Types.ObjectId,
     async () => {
-      const vendorUser = await resolveVendorUser(sub, email, emailVerified);
-      if (!vendorUser) {
-        logger.warn(`${TAG} no active VendorUser for sub in tenant ${tenant._id}`);
-        res.status(403).json({ error: 'You do not have access to this account.' });
-        return;
-      }
-      const actor: DashboardActor = {
-        vendorUserId: (vendorUser._id as Types.ObjectId).toString(),
-        tenantId: (tenant._id as Types.ObjectId).toString(),
-        email: vendorUser.email,
-        role: vendorUser.role,
-      };
-      res.locals.actor = actor;
-      next();
+      const resolution = await resolveVendorUser(sub, email, emailVerified);
+      handle(resolution, tenant);
     },
     tenant.slug,
   );
+};
+
+// Gate for all authenticated /dashboard routes. An active seat proceeds; an
+// invited-but-unverified seat is bounced to the activation gate (distinct
+// `activation_required` code so the SPA can route there); anything else is denied.
+export const dashboardAuthResolver = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  await withVendorSession(req, res, (resolution, tenant) => {
+    if (resolution.kind === 'denied') {
+      logger.warn(`${TAG} no active VendorUser for sub in tenant ${tenant._id}`);
+      res.status(403).json({ error: 'You do not have access to this account.' });
+      return;
+    }
+    if (resolution.kind === 'needs_activation') {
+      res.status(403).json({ error: 'Verify your phone to activate your account.', code: 'activation_required' });
+      return;
+    }
+    const { vendorUser } = resolution;
+    const actor: DashboardActor = {
+      vendorUserId: (vendorUser._id as Types.ObjectId).toString(),
+      tenantId: (tenant._id as Types.ObjectId).toString(),
+      email: vendorUser.email,
+      role: vendorUser.role,
+    };
+    res.locals.actor = actor;
+    next();
+  });
 };

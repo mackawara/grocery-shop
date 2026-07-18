@@ -93,6 +93,12 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   const emailVerified = claims.email_verified === true;
   const expiresIn = tokens.expiresIn();
 
+  // First-login seat binding falls back to the email anchor only when the IdP
+  // marks the email verified (see resolveMembership). Log the claim so we can
+  // confirm Authentik's OIDC provider actually emits email_verified — without it,
+  // invited staff would silently dead-end at /no-access. No PII: a boolean only.
+  logger.info(`${TAG} id-token email_verified=${claims.email_verified === true}`);
+
   // What this identity may do is authoritative in our DB, not in the token:
   // Authentik asserts *who* they are; the VendorUser row asserts *which tenant*
   // they belong to (and dashboardAuthResolver re-checks it on every request).
