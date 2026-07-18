@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { isValidObjectId } from 'mongoose';
 import type { Types } from 'mongoose';
 import { z } from 'zod';
 import Tenant from '../../models/Tenant.ts';
@@ -15,6 +16,7 @@ import {
 } from '../../services/signupOtp.ts';
 import whatsappMessager from '../whatsapp/outgoingMessages.ts';
 import type { DashboardActor } from '../middleware/dashboardAuthResolver.ts';
+import type { ActivationTarget } from '../middleware/activationResolver.ts';
 import { redisClient } from '../../services/redis.ts';
 import { globalKey } from '../../utils/tenantKey.ts';
 import { normalizePhone, isValidPhone } from '../../utils/phone.ts';
@@ -62,16 +64,34 @@ const startSchema = z.object({
   phoneNumber: phoneSchema,
 });
 
-const verifySchema = z.object({
-  phoneNumber: phoneSchema,
+const codeSchema = z.object({
   code: z
     .string()
     .trim()
     .regex(/^\d{6}$/, 'A 6-digit code is required.'),
 });
 
+const verifySchema = codeSchema.extend({
+  phoneNumber: phoneSchema,
+});
+
 const firstIssue = (error: z.ZodError): string =>
   error.issues[0]?.message ?? 'Invalid request body.';
+
+// Send a 6-digit code over the WhatsApp `auth_otp` authentication template. The
+// code fills both the body and the URL/copy button. Shared by signup and the
+// staff first-login activation gate; the caller owns the tenant context (signup
+// runs pre-tenant under a bypass, activation runs inside the tenant).
+const sendAuthOtp = (to: string, code: string) =>
+  whatsappMessager.sendTemplate({
+    to,
+    name: 'auth_otp',
+    languageCode: CONFIG.WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG,
+    components: [
+      { type: 'body', parameters: [{ type: 'text', text: code }] },
+      { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: code }] },
+    ],
+  });
 
 // --- Signup: start ---------------------------------------------------------
 
@@ -120,24 +140,7 @@ export const signupStart = async (req: Request, res: Response): Promise<void> =>
     const sent = await runWithoutTenant(
       'vendor-signup OTP send (pre-tenant: no Tenant exists yet)',
       'WhatsappMessage.create (outbound signup-OTP audit)',
-      () =>
-        whatsappMessager.sendTemplate({
-          to: phone,
-          name: 'auth_otp', //CONFIG.WHATSAPP_VENDOR_AUTH_TEMPLATE,
-          languageCode: CONFIG.WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG,
-          // Authentication template: the code fills the body and the OTP button. If
-          // 'vendor_auth' was created with a copy-code button, change sub_type to
-          // 'copy_code'.
-          components: [
-            { type: 'body', parameters: [{ type: 'text', text: code }] },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: '0',
-              parameters: [{ type: 'text', text: code }],
-            },
-          ],
-        }),
+      () => sendAuthOtp(phone, code),
     );
     if (CONFIG.IS_LOCAL_ENVIRONMENT) {
       logger.info(`${TAG} OTP for ${phone} is ${code}`);
@@ -293,6 +296,9 @@ export const signupVerify = async (req: Request, res: Response): Promise<void> =
             name: pending.ownerName,
             role: UserRole.VENDOR,
             status: VendorUserStatus.INVITED,
+            // The owner already proved phone control via the signup OTP above, so
+            // they skip the first-login activation gate (unlike invited staff).
+            phoneVerified: true,
             // Admin-API handle so tenant approval can trigger the recovery email.
             authUserPk: user.pk,
           });
@@ -344,17 +350,29 @@ export const getMe = async (_req: Request, res: Response): Promise<void> => {
 
 // --- Staff invitations -----------------------------------------------------
 
-// Who may invite, and which roles they may grant. Owners (VENDOR) and managers
-// can invite; they can only create non-privileged staff — never another owner
-// or an admin, so an invite can't escalate privilege.
-const INVITER_ROLES = new Set<string>([UserRole.VENDOR, UserRole.SHOP_MANAGER]);
-const INVITABLE_ROLES = [UserRole.SHOP_MANAGER, UserRole.SALES_REP] as const;
+// Which roles an actor may assign to / act on for a teammate, keyed by the
+// actor's own role. An owner (VENDOR) manages both staff tiers; a shop manager
+// manages only sales reps — never another manager, never the owner. This is the
+// single authority for invite, revoke, remove and resend: an actor may only
+// touch a teammate whose role is in their manageable set, so no action can
+// escalate privilege or let a manager remove a peer/owner.
+const MANAGEABLE_BY: Partial<Record<UserRole, readonly UserRole[]>> = {
+  [UserRole.VENDOR]: [UserRole.SHOP_MANAGER, UserRole.SALES_REP, UserRole.DRIVER],
+  [UserRole.SHOP_MANAGER]: [UserRole.SALES_REP, UserRole.DRIVER],
+};
+
+// Every role an actor could conceivably grant — used only for input validation;
+// the per-actor narrowing (MANAGEABLE_BY) is enforced in the handler.
+const INVITABLE_ROLES = [UserRole.SHOP_MANAGER, UserRole.SALES_REP, UserRole.DRIVER] as const;
+
+const canManageRole = (actorRole: string, targetRole: UserRole): boolean =>
+  (MANAGEABLE_BY[actorRole as UserRole] ?? []).includes(targetRole);
 
 const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email('A valid email is required.')),
   phoneNumber: phoneSchema,
   name: z.string().trim().min(1).max(100).optional(),
-  role: z.enum(INVITABLE_ROLES, { message: 'role must be shop_manager or sales_rep.' }),
+  role: z.enum(INVITABLE_ROLES, { message: 'role must be shop_manager, sales_rep or driver.' }),
 });
 
 // POST /dashboard/invitations — invite a teammate into the caller's tenant.
@@ -364,7 +382,7 @@ const inviteSchema = z.object({
 // their authSubject by email). Acceptance needs no separate endpoint.
 export const inviteVendorUser = async (req: Request, res: Response): Promise<void> => {
   const actor = res.locals.actor as DashboardActor | undefined;
-  if (!actor || !INVITER_ROLES.has(actor.role)) {
+  if (!actor || !MANAGEABLE_BY[actor.role as UserRole]) {
     res.status(403).json({ error: 'You cannot invite team members.' });
     return;
   }
@@ -376,28 +394,50 @@ export const inviteVendorUser = async (req: Request, res: Response): Promise<voi
   }
   const { email, phoneNumber: phone, name, role } = parsed.data;
 
-  // Email already on this tenant's team (scoped query)?
-  const existingEmail = await VendorUser.findOne({ email }).lean();
-  if (existingEmail) {
-    res.status(409).json({ error: 'That email is already on your team.' });
-    return;
-  }
-  // Global phone uniqueness (v1: one phone -> one tenant) — cross-tenant lookup.
-  // .exec() runs the query inside the bypass context (see signupStart note).
-  const phoneTaken = await runWithoutTenant(
-    'staff-invite phone uniqueness check',
-    'VendorUser.findOne({ phoneNumber })',
-    () => VendorUser.findOne({ phoneNumber: phone }).lean().exec(),
-  );
-  if (phoneTaken) {
-    res.status(409).json({ error: 'That phone number is already registered.' });
+  // Privilege gate: a manager may only invite sales reps, never another manager.
+  if (!canManageRole(actor.role, role)) {
+    res.status(403).json({ error: `You cannot invite a ${role.replace('_', ' ')}.` });
     return;
   }
 
-  const tenant = await Tenant.findById(actor.tenantId);
+  let tenant;
+  try {
+    // Email already on this tenant's team (scoped query)?
+    const existingEmail = await VendorUser.findOne({ email }).lean();
+    if (existingEmail) {
+      res.status(409).json({ error: 'That email is already on your team.' });
+      return;
+    }
+    // Global phone uniqueness (v1: one phone -> one tenant) — cross-tenant lookup.
+    // .exec() runs the query inside the bypass context (see signupStart note).
+    const phoneTaken = await runWithoutTenant(
+      'staff-invite phone uniqueness check',
+      'VendorUser.findOne({ phoneNumber })',
+      () => VendorUser.findOne({ phoneNumber: phone }).lean().exec(),
+    );
+    if (phoneTaken) {
+      res.status(409).json({ error: 'That phone number is already registered.' });
+      return;
+    }
+    tenant = await Tenant.findById(actor.tenantId);
+  } catch (err) {
+    logger.error(
+      `${TAG} invite pre-checks failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    res.status(500).json({ error: 'Could not send the invitation. Please try again.' });
+    return;
+  }
+
   if (!tenant?.authGroupPk) {
     logger.error(`${TAG} tenant ${actor.tenantId} has no authGroupPk — cannot invite`);
     res.status(500).json({ error: 'Cannot send invitations right now.' });
+    return;
+  }
+  // No invites for an unapproved/suspended tenant. dashboardAuthResolver already
+  // denies all /dashboard access unless the tenant is ACTIVE/TRIAL, so this is
+  // belt-and-suspenders — but it states the rule explicitly at the invite site.
+  if (![TenantStatus.ACTIVE, TenantStatus.TRIAL].includes(tenant.status)) {
+    res.status(403).json({ error: 'Your account is not active yet.' });
     return;
   }
 
@@ -428,6 +468,7 @@ export const inviteVendorUser = async (req: Request, res: Response): Promise<voi
       return;
     }
     if (isDuplicateKeyError(err)) {
+      logger.warn(`${TAG} duplicate key on invite: ${err instanceof Error ? err.message : String(err)}`);
       res.status(409).json({ error: 'That teammate is already registered.' });
       return;
     }
@@ -450,13 +491,254 @@ export const inviteVendorUser = async (req: Request, res: Response): Promise<voi
   res.status(201).json({ status: 'invited', email, role, ...(warning ? { warning } : {}) });
 };
 
+// Shared preamble for the per-teammate lifecycle actions (revoke/remove/resend):
+// validate the id, authorise the actor against the target's role, and load the
+// target (tenant-scoped, so a member of another tenant is simply not found).
+// Returns the loaded VendorUser, or null after already writing the HTTP error.
+const loadManageableTarget = async (
+  req: Request,
+  res: Response,
+): Promise<InstanceType<typeof VendorUser> | null> => {
+  const actor = res.locals.actor as DashboardActor | undefined;
+  if (!actor || !MANAGEABLE_BY[actor.role as UserRole]) {
+    res.status(403).json({ error: 'You cannot manage team members.' });
+    return null;
+  }
+
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    res.status(400).json({ error: 'Invalid team member id.' });
+    return null;
+  }
+  if (id === actor.vendorUserId) {
+    res.status(400).json({ error: 'You cannot perform this action on yourself.' });
+    return null;
+  }
+
+  let target;
+  try {
+    target = await VendorUser.findById(id);
+  } catch (err) {
+    logger.error(
+      `${TAG} target lookup failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    return null;
+  }
+  if (!target) {
+    res.status(404).json({ error: 'Team member not found.' });
+    return null;
+  }
+  // Privilege gate: only roles the actor manages (a manager can touch sales reps
+  // only; the owner is never in anyone's manageable set, so is untouchable here).
+  if (!canManageRole(actor.role, target.role)) {
+    res.status(403).json({ error: 'You cannot manage this team member.' });
+    return null;
+  }
+  return target;
+};
+
+// DELETE /dashboard/invitations/:id — revoke a still-pending invite. Only valid
+// while the invitee has never logged in (status INVITED, no bound authSubject):
+// hard-delete the Authentik identity and the VendorUser row so the email/phone
+// are freed for a fresh invite. To remove someone who has already joined, use
+// DELETE /dashboard/team/:id (disable) instead.
+export const revokeInvitation = async (req: Request, res: Response): Promise<void> => {
+  const target = await loadManageableTarget(req, res);
+  if (!target) {
+    return;
+  }
+  if (target.status !== VendorUserStatus.INVITED || target.authSubject) {
+    res.status(409).json({ error: 'That teammate has already joined — remove them instead.' });
+    return;
+  }
+
+  try {
+    // Authentik cleanup is best-effort (own .catch); the VendorUser delete is the
+    // authoritative step, so a throw there surfaces as a 500.
+    if (target.authUserPk !== undefined) {
+      await authentik.deleteUser(target.authUserPk).catch((e) => logCleanup('user (revoke)', e));
+    }
+    await target.deleteOne();
+  } catch (err) {
+    logger.error(`${TAG} revoke failed: ${err instanceof Error ? err.message : String(err)}`);
+    res.status(500).json({ error: 'Could not revoke the invitation. Please try again.' });
+    return;
+  }
+
+  logger.info(`${TAG} revoked pending invite ${target._id} in tenant ${target.tenantId}`);
+  res.status(200).json({ status: 'revoked' });
+};
+
+// DELETE /dashboard/team/:id — remove an active teammate. Reversible: sets the
+// VendorUser DISABLED (dashboardAuthResolver denies DISABLED) and disables the
+// Authentik identity, preserving the row for history/attribution. Use revoke for
+// a still-pending invite (that path deletes outright).
+export const removeStaff = async (req: Request, res: Response): Promise<void> => {
+  const target = await loadManageableTarget(req, res);
+  if (!target) {
+    return;
+  }
+  if (target.status === VendorUserStatus.DISABLED) {
+    res.status(409).json({ error: 'That teammate is already removed.' });
+    return;
+  }
+
+  try {
+    // The DISABLED write is authoritative (it's what dashboardAuthResolver gates
+    // on); the Authentik disable is best-effort (own .catch). Order matters: lock
+    // our side first so a failed Authentik call can't leave them locked-out here
+    // but enabled at the IdP without us knowing — a throw surfaces as a 500.
+    target.status = VendorUserStatus.DISABLED;
+    await target.save();
+    if (target.authUserPk !== undefined) {
+      await authentik
+        .setUserActive(target.authUserPk, false)
+        .catch((e) => logCleanup('user (disable)', e));
+    }
+  } catch (err) {
+    logger.error(`${TAG} remove failed: ${err instanceof Error ? err.message : String(err)}`);
+    res.status(500).json({ error: 'Could not remove the team member. Please try again.' });
+    return;
+  }
+
+  logger.info(`${TAG} removed teammate ${target._id} in tenant ${target.tenantId}`);
+  res.status(200).json({ status: 'removed' });
+};
+
+// POST /dashboard/invitations/:id/resend — re-send the account-setup email to a
+// teammate who has not yet joined (status INVITED). No-op for anyone who has
+// already logged in.
+export const resendInvitation = async (req: Request, res: Response): Promise<void> => {
+  const target = await loadManageableTarget(req, res);
+  if (!target) {
+    return;
+  }
+  if (target.status !== VendorUserStatus.INVITED || target.authUserPk === undefined) {
+    res.status(409).json({ error: 'That teammate has already joined.' });
+    return;
+  }
+
+  try {
+    await authentik.sendRecoveryEmail(target.authUserPk);
+  } catch (err) {
+    logger.error(`${TAG} resend failed: ${err instanceof Error ? err.message : String(err)}`);
+    res.status(502).json({ error: 'Could not resend the invitation. Please try again.' });
+    return;
+  }
+
+  logger.info(`${TAG} resent invite ${target._id} in tenant ${target.tenantId}`);
+  res.status(200).json({ status: 'resent' });
+};
+
+// --- First-login activation (invited staff) --------------------------------
+
+// POST /dashboard/activate/start — send the activation OTP to an invited staff
+// member's own phone. Runs behind activationResolver, which admits only an
+// invited-but-unverified seat and puts its server-side phone in res.locals — the
+// client never supplies the number, so the code can't be redirected. Already
+// inside the tenant context, so the outbound-OTP audit scopes normally (no bypass).
+export const activationStart = async (_req: Request, res: Response): Promise<void> => {
+  const target = res.locals.activation as ActivationTarget | undefined;
+  if (!target) {
+    res.status(500).json({ error: 'Activation is unavailable.' });
+    return;
+  }
+
+  try {
+    const code = await generateSignupOtp(target.phoneNumber);
+    if (CONFIG.IS_LOCAL_ENVIRONMENT) {
+      logger.info(`${TAG} activation OTP for ${target.vendorUserId} is ${code}`);
+      res.status(200).json({ status: 'otp_sent' });
+      return;
+    }
+    const sent = await sendAuthOtp(target.phoneNumber, code);
+    if (!sent.success) {
+      logger.error(`${TAG} activation OTP send failed: ${sent.error}`);
+      res.status(502).json({ error: 'Could not send the verification code. Please try again.' });
+      return;
+    }
+    res.status(200).json({ status: 'otp_sent' });
+  } catch (err) {
+    logger.error(
+      `${TAG} activation start failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    res.status(500).json({ error: 'Could not start activation. Please try again.' });
+  }
+};
+
+// POST /dashboard/activate/verify — check the activation OTP and, on success,
+// mark the phone verified and flip the seat ACTIVE. Runs behind activationResolver.
+export const activationVerify = async (req: Request, res: Response): Promise<void> => {
+  const target = res.locals.activation as ActivationTarget | undefined;
+  if (!target) {
+    res.status(500).json({ error: 'Activation is unavailable.' });
+    return;
+  }
+
+  const parsed = codeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: firstIssue(parsed.error) });
+    return;
+  }
+
+  let result;
+  try {
+    result = await verifySignupOtp(target.phoneNumber, parsed.data.code);
+  } catch (err) {
+    logger.error(
+      `${TAG} activation verify (otp) failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    res.status(500).json({ error: 'Could not verify the code. Please try again.' });
+    return;
+  }
+  if (result === OtpVerifyResult.INVALID) {
+    res.status(400).json({ error: 'Invalid verification code.' });
+    return;
+  }
+  if (result !== OtpVerifyResult.OK) {
+    res
+      .status(result === OtpVerifyResult.TOO_MANY_ATTEMPTS ? 429 : 400)
+      .json({ error: 'Verification code expired. Please request a new one.' });
+    return;
+  }
+
+  try {
+    // Scoped load (we are inside the tenant context established by activationResolver).
+    const vendorUser = await VendorUser.findById(target.vendorUserId);
+    if (!vendorUser) {
+      res.status(404).json({ error: 'Team member not found.' });
+      return;
+    }
+    vendorUser.phoneVerified = true;
+    vendorUser.status = VendorUserStatus.ACTIVE;
+    await vendorUser.save();
+    logger.info(`${TAG} activated seat ${vendorUser._id} in tenant ${vendorUser.tenantId}`);
+  } catch (err) {
+    // The code was already consumed, but activation didn't persist. The seat stays
+    // in needs_activation; the user can re-run /activate/start for a fresh code.
+    logger.error(
+      `${TAG} activation persist failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    res.status(500).json({ error: 'Could not activate your account. Please try again.' });
+    return;
+  }
+
+  res.status(200).json({ status: 'active' });
+};
+
 // GET /dashboard/team — list the caller's tenant members (scoped query).
 export const listTeam = async (_req: Request, res: Response): Promise<void> => {
-  const members = await VendorUser.find()
-    .select('email phoneNumber name role status lastLoginAt createdAt')
-    .sort({ createdAt: 1 })
-    .lean();
-  res.status(200).json({ members });
+  try {
+    const members = await VendorUser.find()
+      .select('email phoneNumber name role status lastLoginAt createdAt')
+      .sort({ createdAt: 1 })
+      .lean();
+    res.status(200).json({ members });
+  } catch (err) {
+    logger.error(`${TAG} list team failed: ${err instanceof Error ? err.message : String(err)}`);
+    res.status(500).json({ error: 'Could not load the team. Please try again.' });
+  }
 };
 
 // --- internal helpers ------------------------------------------------------

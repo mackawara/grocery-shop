@@ -1,4 +1,4 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 import session from 'express-session';
@@ -75,6 +75,25 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Server running and working',
   });
+});
+
+// Global backstop error handler. Individual handlers own their expected failures
+// (validation, conflicts, provider errors) and respond directly; this catches
+// anything that slips through — a thrown/rejected async handler Express 5 routes
+// here, or a bug. It logs server-side and returns a generic 500 so no internal
+// detail (stack, driver message, tenant hints) leaks to the client. Must keep all
+// four args so Express recognises it as an error handler; declared last, after
+// every route. If the response already started streaming, delegate to Express's
+// default handler which will destroy the socket.
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  logger.error(
+    `[unhandled] ${req.method} ${req.originalUrl}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+  );
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
 export const startServer = () => {
