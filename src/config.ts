@@ -23,6 +23,13 @@ const mandatoryEnvironmentConstants = [
   'WHATSAPP_PHONE_NUMBER_ID',
   'WHATSAPP_SYSTEM_TOKEN',
   'WHATSAPP_FLOW_PRIVATE_KEY',
+  // Encrypts per-tenant WhatsApp access tokens at rest (see utils/tenantSecret).
+  // Mandatory: without it a tenant's stored credential cannot be read, so a
+  // silent absence would surface as broken messaging rather than a boot failure.
+  'CREDENTIAL_ENC_KEY',
+  // Meta app secret — HMAC key for webhook signature verification. Mandatory so
+  // the check can never be silently skipped because the secret is unset.
+  'WHATSAPP_APP_SECRET',
   // Locally PUBLIC_BASE_URL is derived from the ngrok tunnel; in production it
   // must be set explicitly so gateway callbacks (Paynow resultUrl) resolve.
   ...(isLocal ? ['NGROK_DOMAIN'] : ['PUBLIC_BASE_URL']),
@@ -91,6 +98,17 @@ export const CONFIG = {
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '',
   GOOGLE_DRIVE_FOLDER_ID: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
   WHATSAPP_FLOW_PRIVATE_KEY: process.env.WHATSAPP_FLOW_PRIVATE_KEY || '',
+  // 32-byte AES-256 key, hex-encoded (`openssl rand -hex 32`), used to encrypt
+  // per-tenant WhatsApp access tokens at rest. Secret — never log it. Rotating
+  // it invalidates every stored credential; vendors must reconnect.
+  CREDENTIAL_ENC_KEY: process.env.CREDENTIAL_ENC_KEY || '',
+  // Meta app secret (App Dashboard -> Settings -> Basic). Secret — never log it.
+  WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || '',
+  // Webhook signature rollout switch: false/unset = log-only (mismatches are
+  // logged, requests still processed), 'true' = enforcing (403 on mismatch).
+  // Two-phase on purpose — a wrong app secret with enforcement on would reject
+  // ALL inbound WhatsApp traffic at once.
+  WHATSAPP_SIGNATURE_ENFORCE: process.env.WHATSAPP_SIGNATURE_ENFORCE === 'true',
   WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: process.env.WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE || '',
   // Language code of the WhatsApp authentication template used to deliver vendor
   // signup OTPs (must match the template's configured language). Defaults to en_US.

@@ -19,10 +19,9 @@ import {
 } from '../../utils/metaProductFeed.ts';
 import type { MetaBatchRequest, MetaExportTenant } from '../../utils/metaProductFeed.ts';
 import { sleep } from '../../utils/async.ts';
+import { GRAPH_BASE_URL } from '../../utils/graph.ts';
 
 const TAG = '[CATALOG_SYNC]';
-
-const GRAPH_BASE_URL = `https://graph.facebook.com/${CONFIG.WHATSAPP_GRAPH_API_VERSION}`;
 
 export interface CatalogSyncResult {
   tenantId: string;

@@ -9,6 +9,23 @@ export enum TenantStatus {
   REJECTED = 'rejected',
 }
 
+// State of a tenant's WhatsApp connection, established through Meta Embedded
+// Signup (the vendor owns their own WABA and phone number; we hold a delegated,
+// WABA-scoped access token).
+//
+//  NOT_CONNECTED — never completed Embedded Signup; no credential on file.
+//  CONNECTED     — credential present and last known good.
+//  REVOKED       — the vendor (or Meta) withdrew our app's access. Terminal
+//                  until they reconnect; the stored token is dead, not retryable.
+//  ERROR         — connected but the last Graph call failed in a way we could
+//                  not attribute to revocation (transient/unknown). Retryable.
+export enum WhatsappConnectionStatus {
+  NOT_CONNECTED = 'not_connected',
+  CONNECTED = 'connected',
+  REVOKED = 'revoked',
+  ERROR = 'error',
+}
+
 export enum TenantPlan {
   FREE = 'free',
   STARTER = 'starter',
