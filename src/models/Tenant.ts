@@ -6,6 +6,7 @@ import {
   PaymentMethod,
   PaymentProvider,
   DeliveryMethod,
+  WhatsappConnectionStatus,
 } from '../constants/models.js';
 
 export interface IWhatsappFlowIds {
@@ -53,6 +54,25 @@ export interface IPaymentCredentials {
   omari?: IMobileMoneyCredentials;
 }
 
+// Delegated WhatsApp access obtained through Meta Embedded Signup. The vendor
+// owns their WABA and phone number; this is our app's WABA-scoped token for it.
+//
+// select:false (see schema) AND encrypted at rest — unlike paymentCredentials,
+// which is select:false alone. The difference is deliberate: this is a bearer
+// token, so possession is use, and a database dump must not be enough to send
+// messages as a vendor. Stored here for future use (currently the outbound
+// message layer still uses the platform system token for all WABAs). When the
+// read path is wired up, decrypt via utils/tenantSecret. Never log it, never
+// return it over the API.
+export interface IWhatsappCredentials {
+  // Ciphertext envelope from `encryptSecret`, never the raw token.
+  accessToken: string;
+  grantedAt: Date;
+  // Set when we detect the vendor withdrew access; the token above is dead from
+  // that point and is kept only for audit until they reconnect.
+  revokedAt?: Date;
+}
+
 export interface ITenant extends Document {
   status: TenantStatus;
   plan: TenantPlan;
@@ -67,6 +87,11 @@ export interface ITenant extends Document {
   whatsappPhoneNumberId?: string;
   whatsappCatalogId?: string;
   whatsappBusinessId?: string;
+  // Lifecycle of the Embedded Signup connection. Independent of TenantStatus: a
+  // tenant can be ACTIVE and still fall to REVOKED if the vendor withdraws
+  // access, which is a reconnect prompt, not a suspension.
+  whatsappConnectionStatus: WhatsappConnectionStatus;
+  whatsappCredentials?: IWhatsappCredentials;
   // Authentik group pk for this tenant, captured at signup. The group is the
   // tenant's identity boundary in Authentik; staff invitations are placed into
   // it so they resolve back to this tenant on login.
@@ -91,6 +116,16 @@ const WhatsappFlowIdsSchema = new Schema<IWhatsappFlowIds>(
     onboarding: { type: String },
     returns: { type: String },
     support: { type: String },
+  },
+  { _id: false },
+);
+
+const WhatsappCredentialsSchema = new Schema<IWhatsappCredentials>(
+  {
+    // Stores the `v1:iv:tag:ciphertext` envelope, not the token itself.
+    accessToken: { type: String, required: true },
+    grantedAt: { type: Date, required: true },
+    revokedAt: { type: Date },
   },
   { _id: false },
 );
@@ -141,6 +176,12 @@ const PaymentRoutingSchema = new Schema<Partial<Record<PaymentMethod, PaymentPro
 // at least one payment and delivery method are non-negotiable. Shared by the
 // pre-validate backstop below and the admin activate endpoint, so the reported
 // missing-field list and the enforced rule can never drift apart.
+//
+// TODO(embedded-signup): once the Embedded Signup callback can populate
+// whatsappCredentials, require it here too — ACTIVE should mean "we can
+// actually send", not just "the ids are present". Deliberately NOT added yet:
+// nothing can satisfy it until that endpoint exists, so it would block every
+// activation in the meantime.
 export const missingActivationFields = (tenant: ITenant): string[] => {
   const missing: string[] = [];
   if (!tenant.whatsappPhoneNumberId?.trim()) {
@@ -203,6 +244,16 @@ const TenantSchema = new Schema<ITenant>(
     whatsappPhoneNumberId: { type: String, trim: true },
     whatsappCatalogId: { type: String },
     whatsappBusinessId: { type: String, trim: true },
+    whatsappConnectionStatus: {
+      type: String,
+      enum: Object.values(WhatsappConnectionStatus),
+      default: WhatsappConnectionStatus.NOT_CONNECTED,
+      required: true,
+    },
+    // select:false + encrypted at rest; see IWhatsappCredentials. The payload is
+    // written only by the Embedded Signup callback and read only by the
+    // WhatsApp layer, which decrypts it explicitly.
+    whatsappCredentials: { type: WhatsappCredentialsSchema, select: false },
     // Authentik group pk, stamped at signup; targets staff invitations.
     authGroupPk: { type: String },
     whatsappFlowIds: { type: WhatsappFlowIdsSchema, default: () => ({}) },

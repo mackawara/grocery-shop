@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { csrfGuard } from './controllers/middleware/csrf.js';
+import type { RawBodyRequest } from './controllers/middleware/verifyWhatsappSignature.js';
 import cors from 'cors';
 import helmet from 'helmet';
 
@@ -23,6 +24,21 @@ app.set('trust proxy', 1);
 // Cookie-based BFF sessions need a specific allowed origin + credentials, not
 // the wide-open default.
 app.use(cors({ origin: CONFIG.DASHBOARD_URL, credentials: true }));
+// WhatsApp webhooks only: capture the exact request bytes so signature checks
+// can HMAC what Meta actually signed — re-serialising the parsed body is not
+// byte-stable. Scoped to /whatsapp (matching the route-local parser precedent
+// in payment.routes.ts) so the rest of the app doesn't retain a second copy of
+// every request body, including dashboard payloads carrying credentials.
+// body-parser marks req._body once it has read the stream, so the global
+// express.json() below is a no-op for these requests rather than a double read.
+app.use(
+  '/whatsapp',
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as RawBodyRequest).rawBody = buf;
+    },
+  }),
+);
 app.use(express.json());
 app.use(helmet());
 

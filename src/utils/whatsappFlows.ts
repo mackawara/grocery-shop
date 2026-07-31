@@ -15,6 +15,7 @@
 import axios from 'axios';
 import type { Method } from 'axios';
 
+import { GRAPH_BASE_URL } from './graph.ts';
 import { CONFIG } from '../config.ts';
 import { getTenantId } from '../context/tenantContext.ts';
 import Tenant from '../models/Tenant.ts';
@@ -22,10 +23,6 @@ import { logger } from '../services/logger.ts';
 import UTILS from './index.ts';
 
 const TAG = '[WHATSAPP-FLOWS]';
-
-// Graph API version — single source of truth in CONFIG, shared with the
-// messaging controller and catalog sync.
-const GRAPH_BASE_URL = `https://graph.facebook.com/${CONFIG.WHATSAPP_GRAPH_API_VERSION}`;
 
 /**
  * Valid flow categories. At least one is required when creating a flow.

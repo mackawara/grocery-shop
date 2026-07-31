@@ -43,6 +43,11 @@ import {
   assignDriverHandler,
   navCountsHandler,
 } from '../controllers/dashboard/orders.controller.ts';
+import {
+  connectWhatsappHandler,
+  whatsappStatusHandler,
+  disconnectWhatsappHandler,
+} from '../controllers/dashboard/whatsapp.controller.ts';
 import { rateLimit } from '../controllers/middleware/rateLimit.ts';
 import { dashboardAuthResolver } from '../controllers/middleware/dashboardAuthResolver.ts';
 import { activationResolver } from '../controllers/middleware/activationResolver.ts';
@@ -178,5 +183,23 @@ router.post('/orders/:id/assign-driver', ...configWrite, assignDriverHandler);
 
 // Sidebar badges (currently: unassigned delivery orders).
 router.get('/nav/counts', ...config, navCountsHandler);
+
+// WhatsApp connection — session-scoped like everything above (tenant from the
+// session, never the body). Connect/disconnect are OWNER-only (VENDOR, not
+// SHOP_MANAGER): connecting rebinds which phone number this tenant answers as
+// and can store a credential — a heavier action than editing rates, so it gets
+// a tighter gate than configWrite. Status is readable by any member (the
+// onboarding wizard polls it). Connect is additionally rate-limited per IP:
+// each attempt fans out to Meta Graph calls, so don't let a stuck client (or a
+// probe) hammer them.
+const whatsappOwner = [dashboardAuthResolver, requireRole(UserRole.VENDOR)] as const;
+router.get('/whatsapp/status', dashboardAuthResolver, whatsappStatusHandler);
+router.post(
+  '/whatsapp/connect',
+  byIp('whatsapp-connect'),
+  ...whatsappOwner,
+  connectWhatsappHandler,
+);
+router.post('/whatsapp/disconnect', ...whatsappOwner, disconnectWhatsappHandler);
 
 export default router;
