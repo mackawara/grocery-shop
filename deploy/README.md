@@ -89,13 +89,16 @@ overwritten on every deploy.
 | `WHATSAPP_SYSTEM_TOKEN`                 | yes      |                                                                      |
 | `WHATSAPP_FLOW_PRIVATE_KEY`             | yes      | PEM, single line with literal `\n` (not real newlines) — see `whatsappFlowCrypto.ts` |
 | `WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE`  | no       | only if the PEM above is encrypted                                 |
+| `CREDENTIAL_ENC_KEY`           | yes      | 32-byte AES-256 key, hex (`openssl rand -hex 32`). Encrypts per-tenant WhatsApp tokens at rest. **Rotating it invalidates every stored credential — vendors must reconnect.** |
+| `WHATSAPP_APP_SECRET`                   | yes      | Meta app secret (App Dashboard → Settings → Basic); HMAC key for webhook `X-Hub-Signature-256` verification |
+| `WHATSAPP_SIGNATURE_ENFORCE`            | no       | `true` = reject unsigned/mis-signed webhooks with 403. Unset/other = log-only. **Enable only after a clean log-only period** — a wrong app secret with this on rejects all inbound WhatsApp traffic. |
 | `PUBLIC_BASE_URL`                       | yes      | e.g. `https://api.ventatech.duckdns.org`                           |
 | `AUTHENTIK_ISSUER`                      | yes      |                                                                      |
 | `AUTHENTIK_CLIENT_ID`                   | yes      |                                                                      |
 | `AUTHENTIK_CLIENT_SECRET`               | yes      |                                                                      |
 | `AUTHENTIK_BASE_URL`                    | yes      |                                                                      |
 | `AUTHENTIK_ADMIN_TOKEN`                 | yes      |                                                                      |
-| `AUTHENTIK_RECOVERY_EMAIL_STAGE`        | no       |                                                                      |
+| `AUTHENTIK_RECOVERY_EMAIL_STAGE`        | no       | pk/slug of an Authentik email stage; **required for staff invitations** — see below |
 | `SESSION_SECRET`                        | yes      |                                                                      |
 | `DASHBOARD_URL`                         | yes      |                                                                      |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL`          | no       | only if product-image uploads to Drive are used                    |
@@ -117,6 +120,34 @@ you add a new mandatory var to `src/config.ts`, add it to both the `for key
 in ...` check and the `echo` block in the workflow, or a real deploy will
 fail past that safety net with an unhelpful app-level crash instead of a
 clear `::error::` in the Actions log.
+
+## Authentik prerequisites (staff invitations)
+
+Vendor signup and team invitations provision identities in Authentik via the
+admin API and deliver a set-password link over Authentik's own SMTP. These are
+**admin-console settings in Authentik, not code or `api.env` values** — the app
+adds no new env var for them, but the invite loop is silent if any is missing.
+Verify all four once per environment:
+
+1. **SMTP + email stage.** Authentik must have a working email (SMTP) backend,
+   and `AUTHENTIK_RECOVERY_EMAIL_STAGE` must be the pk/slug of an email stage
+   that uses it. Invites and resends call `POST /core/users/{pk}/recovery_email/`
+   with this stage. If SMTP is unconfigured the invite still succeeds but the API
+   returns an `"Invited, but the setup email could not be sent."` warning and the
+   invitee never gets a link. **Sanity check:** trigger one recovery email
+   end-to-end (e.g. approve a tenant) and confirm it arrives.
+2. **Admin token can PATCH users.** `AUTHENTIK_ADMIN_TOKEN` must permit
+   `PATCH /core/users/{pk}/` (used to disable a removed teammate), on top of the
+   create/delete/recovery it already uses. A full-admin token covers this; a
+   narrowly-scoped token may not.
+3. **Recovery flow enabled.** The emailed link lands on Authentik's recovery
+   flow (set-password + email-verify stages). It must be enabled and reachable,
+   or the link errors. On by default in a standard Authentik install.
+4. **`email_verified` claim.** The OIDC provider must include the `email` scope
+   and emit `email_verified`. First-login seat binding (`resolveMembership`)
+   ignores an unverified email, so without this an invited user silently
+   dead-ends at `/no-access`. Authentik's default `email` scope mapping hardcodes
+   `email_verified: true`; confirm the provider still uses it.
 
 ## Rollback
 
