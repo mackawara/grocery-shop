@@ -7,3 +7,14 @@ export const normalizePhone = (raw: string): string => raw.replace(/\D/g, '');
 // country-specific validation is out of scope; this only rejects obvious junk.
 export const isValidPhone = (normalized: string): boolean =>
   /^[1-9]\d{7,14}$/.test(normalized);
+
+// Log-safe rendering of a customer number: last 4 digits only, e.g. "…4821".
+// Enough to correlate a log line with a conversation while debugging, without
+// writing a full identifiable number into log storage on every message.
+export const maskPhone = (raw: string): string => {
+  const digits = normalizePhone(raw);
+  if (digits.length <= 4) {
+    return '…';
+  }
+  return `…${digits.slice(-4)}`;
+};

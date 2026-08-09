@@ -48,6 +48,10 @@ import {
   whatsappStatusHandler,
   disconnectWhatsappHandler,
 } from '../controllers/dashboard/whatsapp.controller.ts';
+import {
+  listConversationsHandler,
+  getConversationHandler,
+} from '../controllers/dashboard/chats.controller.ts';
 import { rateLimit } from '../controllers/middleware/rateLimit.ts';
 import { dashboardAuthResolver } from '../controllers/middleware/dashboardAuthResolver.ts';
 import { activationResolver } from '../controllers/middleware/activationResolver.ts';
@@ -183,6 +187,24 @@ router.post('/orders/:id/assign-driver', ...configWrite, assignDriverHandler);
 
 // Sidebar badges (currently: unassigned delivery orders).
 router.get('/nav/counts', ...config, navCountsHandler);
+
+// Chats — read-only view of the WhatsApp message log. Session-scoped like the
+// rest of /dashboard (tenant from the session, never the URL), so the phone
+// number in the path can only ever reach this tenant's own messages.
+//
+// Deliberately NOT open to every member. A transcript is the most sensitive
+// read on the dashboard: it exposes the tenant's whole customer phone book plus
+// every conversation's contents — submitted flow answers (delivery addresses),
+// shared GPS pins, and order history. A DRIVER seat needs the single delivery
+// it was assigned, never the customer base, so it is excluded; the customer-
+// facing roles (owner, manager, sales rep) are the ones whose job is reading
+// conversations. This is a narrower gate than configWrite, not a wider one.
+const chatRead = [
+  dashboardAuthResolver,
+  requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER, UserRole.SALES_REP),
+] as const;
+router.get('/chats', ...chatRead, listConversationsHandler);
+router.get('/chats/:phoneNumber/messages', ...chatRead, getConversationHandler);
 
 // WhatsApp connection — session-scoped like everything above (tenant from the
 // session, never the body). Connect/disconnect are OWNER-only (VENDOR, not
