@@ -105,6 +105,8 @@ overwritten on every deploy.
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`    | no       | same format note as the WhatsApp Flow key — see `googleDrive.ts`   |
 | `GOOGLE_DRIVE_FOLDER_ID`                | no       |                                                                      |
 | `PLATFORM_ADMIN_EMAILS`                 | no       | comma-separated break-glass admin allowlist                        |
+| `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE`   | no       | name of the approved driver-assignment template — see below. Blank = drivers are not notified |
+| `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG` | no    | language code of that template; defaults to `en`                   |
 
 `APP_ENV` and `REDIS_HOST_PORT` are hardcoded in the workflow, not secrets
 (always `production` / `6379` in this stack). `PORT` and `REDIS_HOST` are
@@ -120,6 +122,41 @@ you add a new mandatory var to `src/config.ts`, add it to both the `for key
 in ...` check and the `echo` block in the workflow, or a real deploy will
 fail past that safety net with an unhelpful app-level crash instead of a
 clear `::error::` in the Actions log.
+
+## Driver assignment template
+
+When the shop assigns a driver to a delivery, the API messages that driver on
+WhatsApp. A driver is staff, not a customer, so there is no open 24-hour
+customer-care window to send into — the message **must** be a pre-approved
+template. Until one exists, leave `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE` blank:
+assignment still works and the dashboard still records it, the notification
+simply stays dormant (and says so in the logs) instead of firing sends Meta
+will reject.
+
+To turn it on, submit a template on the WABA (Meta Business Manager → WhatsApp
+Manager → Message templates):
+
+- **Category:** Utility (not Marketing — this is transactional).
+- **Language:** whatever you set in `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG`.
+- **Body**, with exactly five positional parameters in this order:
+
+  ```
+  New delivery assigned 🚚
+
+  Order: {{1}}
+  Customer: {{2}}
+  Address: {{3}}
+  Total: {{4}}
+  Payment: {{5}}
+
+  Open the dashboard for the map pin and full order details.
+  ```
+
+Then set `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE` to the approved template's name
+and redeploy. The parameter order is fixed in
+`src/controllers/delivery/driverNotification.controller.ts` — if you change the
+body, change both together or Meta rejects the send with error 132000
+(parameter count mismatch).
 
 ## Authentik prerequisites (staff invitations)
 

@@ -113,6 +113,14 @@ export const CONFIG = {
   // Language code of the WhatsApp authentication template used to deliver vendor
   // signup OTPs (must match the template's configured language). Defaults to en_US.
   WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG: process.env.WHATSAPP_VENDOR_AUTH_TEMPLATE_LANG || 'en',
+  // Name of the approved WhatsApp template used to tell a driver an order has
+  // been assigned to them (5 body parameters — see driverNotification). Blank
+  // by default: a driver has no open service window, so without an approved
+  // template every send would be rejected. Leaving it unset keeps the
+  // notification dormant instead; assignment itself works either way.
+  WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE: process.env.WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE || '',
+  WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG:
+    process.env.WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG || 'en',
   NGROK_DOMAIN: process.env.NGROK_DOMAIN || '',
   PUBLIC_BASE_URL: publicBaseUrl,
   // --- Authentik OIDC / BFF session ---
