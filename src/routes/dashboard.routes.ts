@@ -36,13 +36,25 @@ import {
   listRatesHandler,
   upsertRateHandler,
   deleteRateHandler,
+  createDriverHandler,
+  listDriversHandler,
+  updateDriverHandler,
+  deleteDriverHandler,
 } from '../controllers/delivery/deliveryConfig.controller.ts';
 import {
   listOrdersHandler,
+  listDeliveriesHandler,
   getOrderHandler,
   assignDriverHandler,
+  setDeliveryFeeHandler,
+  setDeliveryStatusHandler,
   navCountsHandler,
 } from '../controllers/dashboard/orders.controller.ts';
+import {
+  getBusinessHandler,
+  updateBusinessHandler,
+  seedDeliveryDefaultsHandler,
+} from '../controllers/dashboard/business.controller.ts';
 import {
   connectWhatsappHandler,
   whatsappStatusHandler,
@@ -164,6 +176,15 @@ const configWrite = [
   dashboardAuthResolver,
   requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER),
 ] as const;
+// Business profile. The shop's GPS lives here and every ring zone / per-km cell
+// is measured from it, so this is delivery configuration in all but name —
+// gated identically.
+router.get('/business', ...config, getBusinessHandler);
+router.patch('/business', ...configWrite, updateBusinessHandler);
+// Starter delivery setup (idempotent) — for tenants created before signup
+// seeded it, and as the "give me the defaults" button.
+router.post('/delivery/defaults', ...configWrite, seedDeliveryDefaultsHandler);
+
 router.get('/zones', ...config, listZonesHandler);
 router.post('/zones', ...configWrite, createZoneHandler);
 router.get('/zones/:id', ...config, getZoneHandler);
@@ -174,16 +195,32 @@ router.post('/vehicles', ...configWrite, createVehicleHandler);
 router.get('/vehicles/:id', ...config, getVehicleHandler);
 router.patch('/vehicles/:id', ...configWrite, updateVehicleHandler);
 router.delete('/vehicles/:id', ...configWrite, deleteVehicleHandler);
+// Drivers: a roster of name + phone, not dashboard accounts (see
+// delivery/models/Driver.ts). Gated like the rest of the delivery config rather
+// than like staff invitations — adding a driver grants no access to anything.
+router.get('/drivers', ...config, listDriversHandler);
+router.post('/drivers', ...configWrite, createDriverHandler);
+router.patch('/drivers/:id', ...configWrite, updateDriverHandler);
+router.delete('/drivers/:id', ...configWrite, deleteDriverHandler);
+
 // Rate matrix: PUT sets a (zone × tier) cell — upsert, no separate POST/PATCH.
 router.get('/rates', ...config, listRatesHandler);
 router.put('/rates', ...configWrite, upsertRateHandler);
 router.delete('/rates/:id', ...configWrite, deleteRateHandler);
 
-// Orders — reads open to any authenticated tenant member (a driver can see the
-// board); driver allocation is gated like the other operational writes.
+// Orders — reads open to any authenticated tenant member; driver allocation is
+// gated like the other operational writes.
 router.get('/orders', ...config, listOrdersHandler);
+// The delivery board reads the fulfilment jobs, not the orders.
+router.get('/deliveries', ...config, listDeliveriesHandler);
 router.get('/orders/:id', ...config, getOrderHandler);
 router.post('/orders/:id/assign-driver', ...configWrite, assignDriverHandler);
+// Manual delivery fee — priced like a rate cell, so it takes the pricing gate.
+router.post('/orders/:id/delivery-fee', ...configWrite, setDeliveryFeeHandler);
+// Fulfilment milestones (dispatched / delivered). The shop marks these: a
+// driver is a roster entry with no dashboard login at all (see
+// delivery/models/Driver.ts), so there is no driver-side path to widen this to.
+router.post('/orders/:id/delivery-status', ...configWrite, setDeliveryStatusHandler);
 
 // Sidebar badges (currently: unassigned delivery orders).
 router.get('/nav/counts', ...config, navCountsHandler);
@@ -195,10 +232,10 @@ router.get('/nav/counts', ...config, navCountsHandler);
 // Deliberately NOT open to every member. A transcript is the most sensitive
 // read on the dashboard: it exposes the tenant's whole customer phone book plus
 // every conversation's contents — submitted flow answers (delivery addresses),
-// shared GPS pins, and order history. A DRIVER seat needs the single delivery
-// it was assigned, never the customer base, so it is excluded; the customer-
-// facing roles (owner, manager, sales rep) are the ones whose job is reading
-// conversations. This is a narrower gate than configWrite, not a wider one.
+// shared GPS pins, and order history. Only the customer-facing roles (owner,
+// manager, sales rep) have any business reading it, so the allowlist is
+// explicit rather than "everyone who can log in" — any legacy DRIVER seat is
+// excluded by omission. This is a narrower gate than configWrite, not a wider one.
 const chatRead = [
   dashboardAuthResolver,
   requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER, UserRole.SALES_REP),

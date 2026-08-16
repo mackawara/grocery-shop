@@ -1,25 +1,27 @@
 import { logger } from '../../services/logger.ts';
 import whatsappMessager, { messageComposer } from '../whatsapp/outgoingMessages.ts';
 import OrderModel from '../../models/Order.ts';
-import type { IOrder } from '../../models/Order.ts';
 import { OrderItem } from '../../models/OrderItem.ts';
 import ProductModel from '../../models/Product.ts';
+import UserModel from '../../models/User.ts';
 import { requireTenantId } from '../../context/tenantContext.ts';
-import { quoteDelivery, computeVehicleRequirement, QuoteStatus } from '../../delivery/index.ts';
+import {
+  quoteDelivery,
+  computeVehicleRequirement,
+  QuoteStatus,
+  getDeliveryByOrderNumber,
+} from '../../delivery/index.ts';
 import type { CartItemPhysicals, GeoPoint, Money } from '../../delivery/index.ts';
-import { DeliveryMethod, DeliveryStatus, Currency } from '../../constants/models.ts';
+import { ensureOrderDelivery } from './orderDelivery.ts';
+import { DeliveryMethod } from '../../constants/models.ts';
 import {
   buildDeliveryConfirmButtonId,
   buildDeliveryCollectButtonId,
 } from '../../constants/delivery.ts';
+import { ORDER_CURRENCY } from '../../constants/payments.ts';
 import { initiateOrderPayment } from '../payments/payment.controller.ts';
 
 const TAG = '[DELIVERY_QUOTE_FLOW]';
-
-// Payments charge `order.totalAmount` in this currency (payment.controller's
-// DEFAULT_CURRENCY), so a fee can only be folded into the total when it
-// matches. A mismatched rate card falls back to attendant handling.
-const ORDER_CURRENCY = Currency.USD;
 
 const formatMoney = (money: Money): string => `${money.currency} ${(money.amount / 100).toFixed(2)}`;
 
@@ -61,6 +63,45 @@ const collectButton = (orderNumber: string) => ({
 });
 
 /**
+ * Ask the customer to confirm the new total before anything is charged.
+ * Shared by the automatic quote and the shop's manual override so both offer
+ * the identical choice — confirm & pay, or switch to collection — and both land
+ * on the same `handleDeliveryQuoteConfirm` latch.
+ *
+ * `itemsTotal` is the order total *before* the fee: the fee is only folded in
+ * on the confirm tap, never here.
+ */
+const sendFeeConfirmation = async (
+  from: string,
+  orderNumber: string,
+  itemsTotal: number,
+  fee: Money,
+  detailLines: string[],
+): Promise<void> => {
+  const newTotal = Math.round((itemsTotal + toMajorUnits(fee)) * 100) / 100;
+
+  await whatsappMessager.sendInteractive(
+    from,
+    messageComposer.messageWithReplyButtons({
+      text:
+        `Delivery quote for order ${orderNumber}:\n\n` +
+        `${detailLines.join('\n')}\n` +
+        `💰 Delivery fee: ${formatMoney(fee)}\n\n` +
+        `New total: ${ORDER_CURRENCY} ${newTotal.toFixed(2)} ` +
+        `(items ${ORDER_CURRENCY} ${itemsTotal.toFixed(2)} + delivery ${formatMoney(fee)})\n\n` +
+        `Confirm to proceed with payment.`,
+      buttons: [
+        {
+          type: 'reply',
+          reply: { id: buildDeliveryConfirmButtonId(orderNumber), title: 'Confirm & pay' },
+        },
+        collectButton(orderNumber),
+      ],
+    }),
+  );
+};
+
+/**
  * Quote the delivery for an order once its GPS pin has landed, persist the
  * quote on the order, and ask the customer to confirm the new total before any
  * payment is initiated (the fee is never charged without an explicit tap).
@@ -85,7 +126,15 @@ export const quoteAndConfirmDelivery = async (
     return;
   }
 
-  if (order.deliveryDetails?.feeApplied) {
+  const delivery = await getDeliveryByOrderNumber(tenantId, orderNumber);
+  if (!delivery) {
+    // The job is created the moment the customer picks a method, and the pin
+    // only arrives after that — so its absence is a broken flow, not a state.
+    logger.warn(`${TAG} order ${orderNumber} has no delivery job — cannot quote`);
+    return;
+  }
+
+  if (delivery.feeApplied) {
     logger.info(
       `${TAG} order ${orderNumber} fee already confirmed — pin updated, pricing unchanged`,
     );
@@ -97,21 +146,19 @@ export const quoteAndConfirmDelivery = async (
   const requirement = computeVehicleRequirement(physicals);
   const result = await quoteDelivery(tenantId, shopOrigin, dropoff, requirement);
 
-  const deliveryDetails = order.deliveryDetails ?? { status: DeliveryStatus.PENDING };
-  deliveryDetails.quoteStatus = result.status;
+  delivery.quoteStatus = result.status;
   if (result.status === QuoteStatus.QUOTED) {
-    deliveryDetails.fee = result.fee;
-    deliveryDetails.vehicleTier = result.tier;
-    deliveryDetails.distanceKm = result.distanceKm;
-    deliveryDetails.feeApplied = false;
+    delivery.fee = result.fee;
+    delivery.vehicleTier = result.tier;
+    delivery.distanceKm = result.distanceKm;
+    delivery.feeApplied = false;
   } else {
-    deliveryDetails.fee = undefined;
-    deliveryDetails.vehicleTier = undefined;
-    deliveryDetails.distanceKm = undefined;
-    deliveryDetails.feeApplied = undefined;
+    delivery.fee = undefined;
+    delivery.vehicleTier = undefined;
+    delivery.distanceKm = undefined;
+    delivery.feeApplied = undefined;
   }
-  order.deliveryDetails = deliveryDetails as IOrder['deliveryDetails'];
-  await order.save();
+  await delivery.save();
 
   if (result.status !== QuoteStatus.QUOTED) {
     logger.warn(
@@ -144,31 +191,78 @@ export const quoteAndConfirmDelivery = async (
     return;
   }
 
-  const itemsTotal = order.totalAmount;
-  const newTotal = Math.round((itemsTotal + toMajorUnits(result.fee)) * 100) / 100;
   const distanceNote =
     result.distanceKm !== undefined ? ` (~${result.distanceKm.toFixed(1)} km)` : '';
 
-  await whatsappMessager.sendInteractive(
-    from,
-    messageComposer.messageWithReplyButtons({
-      text:
-        `Delivery quote for order ${orderNumber}:\n\n` +
-        `📍 Area: ${result.zoneName}${distanceNote}\n` +
-        `🚚 Vehicle: ${result.vehicleName}\n` +
-        `💰 Delivery fee: ${formatMoney(result.fee)}\n\n` +
-        `New total: ${ORDER_CURRENCY} ${newTotal.toFixed(2)} ` +
-        `(items ${ORDER_CURRENCY} ${itemsTotal.toFixed(2)} + delivery ${formatMoney(result.fee)})\n\n` +
-        `Confirm to proceed with payment.`,
-      buttons: [
-        {
-          type: 'reply',
-          reply: { id: buildDeliveryConfirmButtonId(orderNumber), title: 'Confirm & pay' },
-        },
-        collectButton(orderNumber),
-      ],
-    }),
-  );
+  await sendFeeConfirmation(from, orderNumber, order.totalAmount, result.fee, [
+    `📍 Area: ${result.zoneName}${distanceNote}`,
+    `🚚 Vehicle: ${result.vehicleName}`,
+  ]);
+};
+
+// Why a shop-set fee could not be offered to the customer. Mapped to HTTP by
+// the dashboard handler; the flow itself never throws for these.
+export type ManualFeeFailure =
+  | 'not_found'
+  | 'not_delivery'
+  | 'already_applied'
+  | 'no_customer_phone';
+
+export type ManualFeeResult = { ok: true } | { ok: false; reason: ManualFeeFailure };
+
+/**
+ * The shop's manual delivery fee, set from the dashboard.
+ *
+ * This is the escape hatch for every case the automatic quote can't price —
+ * out of area, no fitting vehicle, no rate cell, or a rate card in a currency
+ * the payment path can't charge. It writes the same fields the quote engine
+ * writes and re-uses the same confirmation prompt, so the customer's "Confirm &
+ * pay" tap runs through the identical `feeApplied` latch: the shop sets the
+ * price, the customer still consents to it, and the fee is still only ever
+ * added once.
+ *
+ * Refused once the fee is confirmed — at that point pricing is final and money
+ * may already be in motion, so a correction is a refund, not an edit.
+ *
+ * Must run inside the tenant context (dashboardAuthResolver establishes it).
+ */
+export const applyManualDeliveryFee = async (
+  orderNumber: string,
+  fee: Money,
+): Promise<ManualFeeResult> => {
+  const tenantId = requireTenantId('manual delivery fee');
+
+  const order = await OrderModel.findOne({ orderNumber });
+  if (!order) {
+    return { ok: false, reason: 'not_found' };
+  }
+  const delivery = await getDeliveryByOrderNumber(tenantId, orderNumber);
+  if (!delivery || delivery.method !== DeliveryMethod.DOOR_DELIVERY) {
+    return { ok: false, reason: 'not_delivery' };
+  }
+  if (delivery.feeApplied) {
+    return { ok: false, reason: 'already_applied' };
+  }
+
+  // The customer is messaged on the number their WhatsApp order came from.
+  const customer = await UserModel.findById(order.user).select('phoneNumber').lean();
+  if (!customer?.phoneNumber) {
+    logger.warn(`${TAG} order ${orderNumber} has no customer phone — cannot offer a manual fee`);
+    return { ok: false, reason: 'no_customer_phone' };
+  }
+
+  delivery.quoteStatus = QuoteStatus.QUOTED;
+  delivery.fee = fee;
+  delivery.feeApplied = false;
+  await delivery.save();
+
+  logger.info(`${TAG} shop set a manual fee of ${formatMoney(fee)} on order ${orderNumber}`);
+
+  await sendFeeConfirmation(customer.phoneNumber, orderNumber, order.totalAmount, fee, [
+    `📍 Delivery to your shared location`,
+    `🏪 Fee set by the shop`,
+  ]);
+  return { ok: true };
 };
 
 /**
@@ -190,8 +284,11 @@ export const handleDeliveryQuoteConfirm = async (
     return;
   }
 
-  const deliveryDetails = order.deliveryDetails;
-  if (deliveryDetails?.quoteStatus !== QuoteStatus.QUOTED || !deliveryDetails.fee) {
+  const delivery = await getDeliveryByOrderNumber(
+    requireTenantId('delivery fee confirmation'),
+    orderNumber,
+  );
+  if (delivery?.quoteStatus !== QuoteStatus.QUOTED || !delivery.fee) {
     logger.warn(`${TAG} confirm tap for order ${orderNumber} without a valid quote`);
     await whatsappMessager.sendFreeFormTextMessage(
       from,
@@ -200,13 +297,19 @@ export const handleDeliveryQuoteConfirm = async (
     return;
   }
 
-  if (!deliveryDetails.feeApplied) {
-    order.totalAmount =
-      Math.round((order.totalAmount + toMajorUnits(deliveryDetails.fee)) * 100) / 100;
-    deliveryDetails.feeApplied = true;
+  if (!delivery.feeApplied) {
+    // The fee is charged through the order total, so two records change: the
+    // delivery latches that the fee has been applied, and the order gains the
+    // money. The LATCH GOES FIRST, deliberately — these are separate writes,
+    // and if the process dies between them the customer is undercharged by the
+    // delivery fee rather than charged for it twice. Losing a fee is a
+    // reconcilable mistake; double-charging a customer is not.
+    delivery.feeApplied = true;
+    await delivery.save();
+    order.totalAmount = Math.round((order.totalAmount + toMajorUnits(delivery.fee)) * 100) / 100;
     await order.save();
     logger.info(
-      `${TAG} order ${orderNumber} delivery fee ${formatMoney(deliveryDetails.fee)} applied — ` +
+      `${TAG} order ${orderNumber} delivery fee ${formatMoney(delivery.fee)} applied — ` +
         `new total ${order.totalAmount.toFixed(2)}`,
     );
   }
@@ -234,7 +337,8 @@ export const handleDeliverySwitchToCollect = async (
     return;
   }
 
-  if (order.deliveryDetails?.feeApplied) {
+  const existing = await getDeliveryByOrderNumber(requireTenantId('collect switch'), orderNumber);
+  if (existing?.feeApplied) {
     logger.info(`${TAG} collect tap after fee confirmed on ${orderNumber} — refusing switch`);
     await whatsappMessager.sendFreeFormTextMessage(
       from,
@@ -243,10 +347,9 @@ export const handleDeliverySwitchToCollect = async (
     return;
   }
 
-  const deliveryDetails = order.deliveryDetails ?? { status: DeliveryStatus.PENDING };
-  deliveryDetails.method = DeliveryMethod.COLLECT;
-  order.deliveryDetails = deliveryDetails as IOrder['deliveryDetails'];
-  await order.save();
+  // Re-point the fulfilment job: it stops being a delivery and, with it, stops
+  // needing a driver.
+  await ensureOrderDelivery(order, DeliveryMethod.COLLECT);
 
   await whatsappMessager.sendFreeFormTextMessage(
     from,

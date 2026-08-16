@@ -77,7 +77,7 @@ const updateConversationSummary = async (data: WhatsappMessagePayload, messageId
         },
       },
     ],
-    { upsert: true },
+    { upsert: true, updatePipeline: true },
   );
 };
 

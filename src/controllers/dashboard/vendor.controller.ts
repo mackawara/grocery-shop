@@ -23,6 +23,7 @@ import { normalizePhone, isValidPhone } from '../../utils/phone.ts';
 import { SIGNUP_OTP_TTL_SECONDS } from '../../constants/auth.ts';
 import { CONFIG } from '../../config.ts';
 import { logger } from '../../services/logger.ts';
+import { seedDefaultDeliverySetup } from '../../delivery/index.ts';
 
 // Vendor (merchant-side) controller. Houses the vendor account lifecycle:
 // signup (start/verify) today, approval and others to follow.
@@ -302,6 +303,19 @@ export const signupVerify = async (req: Request, res: Response): Promise<void> =
             // Admin-API handle so tenant approval can trigger the recovery email.
             authUserPk: user.pk,
           });
+
+          // Starter delivery setup, so the vendor's first order can be quoted
+          // without them building a rate matrix first. Best-effort: a tenant
+          // with no zones is a configuration gap the dashboard can fix later
+          // (POST /dashboard/delivery/defaults), never a reason to fail — and
+          // roll back — an otherwise complete signup.
+          await seedDefaultDeliverySetup(tenantId.toString()).catch((e) =>
+            logger.error(
+              `${TAG} delivery defaults failed for new tenant ${tenantId?.toString()}: ${
+                e instanceof Error ? e.message : String(e)
+              }`,
+            ),
+          );
         } catch (err) {
           // Best-effort compensating cleanup, reverse order. Each catch keeps a
           // cleanup failure from masking the original error.
@@ -356,14 +370,19 @@ export const getMe = async (_req: Request, res: Response): Promise<void> => {
 // single authority for invite, revoke, remove and resend: an actor may only
 // touch a teammate whose role is in their manageable set, so no action can
 // escalate privilege or let a manager remove a peer/owner.
+//
+// DRIVER is deliberately absent. A driver is a roster entry (name + phone) in
+// the delivery module, not a dashboard account — see delivery/models/Driver.ts.
+// The enum member survives for rows created before that split; nothing may
+// invite a new one.
 const MANAGEABLE_BY: Partial<Record<UserRole, readonly UserRole[]>> = {
-  [UserRole.VENDOR]: [UserRole.SHOP_MANAGER, UserRole.SALES_REP, UserRole.DRIVER],
-  [UserRole.SHOP_MANAGER]: [UserRole.SALES_REP, UserRole.DRIVER],
+  [UserRole.VENDOR]: [UserRole.SHOP_MANAGER, UserRole.SALES_REP],
+  [UserRole.SHOP_MANAGER]: [UserRole.SALES_REP],
 };
 
 // Every role an actor could conceivably grant — used only for input validation;
 // the per-actor narrowing (MANAGEABLE_BY) is enforced in the handler.
-const INVITABLE_ROLES = [UserRole.SHOP_MANAGER, UserRole.SALES_REP, UserRole.DRIVER] as const;
+const INVITABLE_ROLES = [UserRole.SHOP_MANAGER, UserRole.SALES_REP] as const;
 
 const canManageRole = (actorRole: string, targetRole: UserRole): boolean =>
   (MANAGEABLE_BY[actorRole as UserRole] ?? []).includes(targetRole);
@@ -372,7 +391,7 @@ const inviteSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email('A valid email is required.')),
   phoneNumber: phoneSchema,
   name: z.string().trim().min(1).max(100).optional(),
-  role: z.enum(INVITABLE_ROLES, { message: 'role must be shop_manager, sales_rep or driver.' }),
+  role: z.enum(INVITABLE_ROLES, { message: 'role must be shop_manager or sales_rep.' }),
 });
 
 // POST /dashboard/invitations — invite a teammate into the caller's tenant.
