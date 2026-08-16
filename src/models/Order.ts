@@ -1,17 +1,10 @@
-// TODO: Stub model — extend with delivery address, discount, and channel fields before production use
+// TODO: Stub model — extend with discount and channel fields before production use
 import type { Document, Types } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
-import {
-  OrderStatus,
-  PaymentStatus,
-  DeliveryStatus,
-  QuoteStatus,
-  VehicleTier,
-  Currency,
-} from '../constants/models.ts';
+import { OrderStatus, PaymentStatus } from '../constants/models.ts';
 import { tenantScope } from './plugins/tenantScope.ts';
 
-export { OrderStatus, PaymentStatus, DeliveryStatus };
+export { OrderStatus, PaymentStatus };
 
 export interface IOrder extends Document {
   tenantId: Types.ObjectId;
@@ -29,32 +22,22 @@ export interface IOrder extends Document {
     reference?: string;
     mobileNumber?: string;
   };
-  deliveryDetails?: {
-    method?: string;
-    // Foreign key to DeliveryAddress — the delivery controller owns the
-    // canonical address document (typed fields + GPS). Order only points
-    // at it; it does not snapshot any address fields.
-    address?: Types.ObjectId;
-    status: DeliveryStatus;
-    expectedDeliveryDate?: Date;
-    // --- Delivery quote (written at GPS-pin time by the quote flow). The fee
-    // is the source of truth in minor units; it is folded into `totalAmount`
-    // (major units) only once the customer confirms — `feeApplied` is the
-    // idempotency latch for that fold.
-    quoteStatus?: QuoteStatus;
-    fee?: { amount: number; currency: Currency };
-    feeApplied?: boolean;
-    vehicleTier?: VehicleTier;
-    distanceKm?: number;
-    // Driver allocation, made by the shop on the dashboard. `driver` refs a
-    // VendorUser with role DRIVER; the name is snapshotted so the order's
-    // history stays legible even if the seat is later renamed/removed.
-    assignment?: {
-      driver: Types.ObjectId;
-      driverNameSnapshot?: string;
-      assignedAt: Date;
-    };
-  };
+  // Foreign key to this order's fulfilment job (`Delivery`), set once the
+  // customer chooses how to receive the order. This is the ONLY delivery data
+  // on the order: method, address, the quote, the fee, the driver and the
+  // lifecycle all live on that record (src/delivery/models/Delivery.ts).
+  //
+  // The relationship is recorded from both ends, and the delivery's own `order`
+  // field is the AUTHORITATIVE direction — it is uniquely indexed, so the
+  // database itself guarantees one job per order. This side is a convenience
+  // pointer that resolves the job in one populate. Because it is a second copy
+  // of one relationship, exactly one function writes it: `ensureOrderDelivery`
+  // (controllers/delivery/orderDelivery.ts), which creates the job and stamps
+  // the order together. Never assign this by hand.
+  //
+  // `totalAmount` is the one place delivery money touches the order: the fee is
+  // folded into it on confirmation, because the total is what gets charged.
+  delivery?: Types.ObjectId;
 }
 
 const OrderSchema = new Schema<IOrder>(
@@ -72,52 +55,14 @@ const OrderSchema = new Schema<IOrder>(
     orderDate: { type: Date, required: true },
     notes: { type: String },
     orderItems: [{ type: Schema.Types.ObjectId, ref: 'OrderItem' }],
+    // Back-reference to the fulfilment job — written only by
+    // ensureOrderDelivery, alongside the job it points at.
+    delivery: { type: Schema.Types.ObjectId, ref: 'Delivery' },
     paymentDetails: {
       status: { type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING },
       method: { type: String },
       reference: { type: String },
       mobileNumber: { type: String },
-    },
-    deliveryDetails: {
-      method: { type: String },
-      address: { type: Schema.Types.ObjectId, ref: 'DeliveryAddress' },
-      status: {
-        type: String,
-        enum: Object.values(DeliveryStatus),
-        default: DeliveryStatus.PENDING,
-      },
-      expectedDeliveryDate: { type: Date },
-      quoteStatus: { type: String, enum: Object.values(QuoteStatus) },
-      fee: {
-        type: new Schema(
-          {
-            amount: {
-              type: Number,
-              required: true,
-              min: 0,
-              validate: {
-                validator: Number.isInteger,
-                message: 'fee amount must be an integer in minor units (e.g. cents)',
-              },
-            },
-            currency: { type: String, required: true, enum: Object.values(Currency) },
-          },
-          { _id: false },
-        ),
-      },
-      feeApplied: { type: Boolean },
-      vehicleTier: { type: String, enum: Object.values(VehicleTier) },
-      distanceKm: { type: Number, min: 0 },
-      assignment: {
-        type: new Schema(
-          {
-            driver: { type: Schema.Types.ObjectId, ref: 'VendorUser', required: true },
-            driverNameSnapshot: { type: String, trim: true },
-            assignedAt: { type: Date, required: true },
-          },
-          { _id: false },
-        ),
-      },
     },
   },
   { timestamps: true },

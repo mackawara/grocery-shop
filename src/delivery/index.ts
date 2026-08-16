@@ -46,6 +46,51 @@ export type { ZoneInput } from './zone.service.ts';
 export { default as DeliveryZone, DeliveryZoneKind } from './models/DeliveryZone.ts';
 export type { IDeliveryZone, IZoneRing, IZoneGeometry } from './models/DeliveryZone.ts';
 
+// Deliveries — the fulfilment job per order (source of truth for driver,
+// lifecycle status and milestone timestamps)
+export {
+  upsertDeliveryForOrder,
+  getDeliveryByOrder,
+  getDeliveryByOrderNumber,
+  listDeliveries,
+  countDeliveries,
+  assignDriver,
+  advanceDelivery,
+} from './delivery.service.ts';
+export type {
+  DeliveryJobInput,
+  DeliveryQuery,
+  DeliveryPage,
+  DeliveryTransition,
+  AssignResult,
+  AssignFailure,
+  TransitionResult,
+  TransitionFailure,
+} from './delivery.service.ts';
+export { default as Delivery } from './models/Delivery.ts';
+export type { IDelivery } from './models/Delivery.ts';
+
+// Drivers (a delivery resource — name + phone, never a dashboard account)
+export {
+  createDriver,
+  listDrivers,
+  getDriver,
+  updateDriver,
+  deleteDriver,
+} from './driver.service.ts';
+export type { DriverInput } from './driver.service.ts';
+export { default as Driver } from './models/Driver.ts';
+export type { IDriver } from './models/Driver.ts';
+
+// Starter setup (one catch-all zone + one vehicle + one flat cell)
+export {
+  seedDefaultDeliverySetup,
+  DEFAULT_ZONE_NAME,
+  DEFAULT_ZONE_MAX_KM,
+  DEFAULT_FLAT_FEE,
+} from './defaults.ts';
+export type { DeliveryDefaultsResult } from './defaults.ts';
+
 // Fleet / vehicles
 export {
   createVehicle,

@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { logger } from '../../services/logger.ts';
-import { DeliveryZoneKind, DeliveryRateKind, VehicleTier, Currency } from '../../constants/models.ts';
+import { DeliveryZoneKind, DeliveryRateKind, VehicleTier } from '../../constants/models.ts';
+import { ORDER_CURRENCY } from '../../constants/payments.ts';
 import {
   createZone,
   listZones,
@@ -16,9 +17,14 @@ import {
   upsertRate,
   listRates,
   deleteRate,
+  createDriver,
+  listDrivers,
+  updateDriver,
+  deleteDriver,
 } from '../../delivery/index.ts';
-import type { ZoneInput, VehicleInput, RateInput } from '../../delivery/index.ts';
+import type { ZoneInput, VehicleInput, RateInput, DriverInput } from '../../delivery/index.ts';
 import type { DashboardActor } from '../middleware/dashboardAuthResolver.ts';
+import { normalizePhone, isValidPhone } from '../../utils/phone.ts';
 
 const TAG = '[delivery-config]';
 
@@ -90,11 +96,33 @@ const vehicleCreateSchema = z.object({
 });
 const vehicleUpdateSchema = vehicleCreateSchema.partial();
 
+// --- Driver validation --------------------------------------------------------
+
+// Onboarding a driver is a name and a number — no email, no invitation, no
+// account. The number is normalized here so the roster and the WhatsApp send
+// target are always the same canonical digits.
+const driverCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  phoneNumber: z
+    .string()
+    .transform(normalizePhone)
+    .refine(isValidPhone, 'A valid phone number is required.'),
+  active: z.boolean().optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+const driverUpdateSchema = driverCreateSchema.partial();
+
 // --- Rate-matrix validation ---------------------------------------------------
 
+// Cells are held to the order currency at authoring time. A cell in any other
+// currency quotes fine but can never be folded into an order total, so the
+// customer would be told "the shop will confirm your fee shortly" and the order
+// would stall — reject it here instead, where the vendor can see why.
 const moneySchema = z.object({
   amount: z.number().int().nonnegative(), // minor units
-  currency: z.enum(Currency),
+  currency: z.literal(ORDER_CURRENCY, {
+    message: `Delivery rates must be priced in ${ORDER_CURRENCY}.`,
+  }),
 });
 
 // A cell must carry the pricing fields its kind needs (the model re-checks too).
@@ -247,6 +275,69 @@ export const deleteVehicleHandler = async (req: Request, res: Response): Promise
     const deleted = await deleteVehicle(tenantOf(res), String(req.params.id));
     if (!deleted) {
       res.status(404).json({ error: 'Vehicle not found.' });
+      return;
+    }
+    res.status(204).end();
+  } catch (error) {
+    handleError(error, res);
+  }
+};
+
+// --- Driver handlers ----------------------------------------------------------
+
+export const createDriverHandler = async (req: Request, res: Response): Promise<void> => {
+  const parsed = driverCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: firstIssue(parsed.error) });
+    return;
+  }
+  try {
+    const driver = await createDriver(tenantOf(res), parsed.data as DriverInput);
+    res.status(201).json({ driver });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
+
+export const listDriversHandler = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const drivers = await listDrivers(tenantOf(res));
+    res.status(200).json({ drivers });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
+
+export const updateDriverHandler = async (req: Request, res: Response): Promise<void> => {
+  const parsed = driverUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: firstIssue(parsed.error) });
+    return;
+  }
+  try {
+    const driver = await updateDriver(
+      tenantOf(res),
+      String(req.params.id),
+      parsed.data as Partial<DriverInput>,
+    );
+    if (!driver) {
+      res.status(404).json({ error: 'Driver not found.' });
+      return;
+    }
+    res.status(200).json({ driver });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
+
+// Hard delete. Orders already carried by this driver keep their snapshotted
+// name, so history stays readable — but deactivating is the better move for
+// someone who has driven before, and the dashboard says so.
+export const deleteDriverHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const deleted = await deleteDriver(tenantOf(res), String(req.params.id));
+    if (!deleted) {
+      res.status(404).json({ error: 'Driver not found.' });
       return;
     }
     res.status(204).end();

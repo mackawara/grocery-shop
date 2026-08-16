@@ -116,6 +116,8 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           PLATFORM_ADMIN_EMAILS: ${{ secrets.PLATFORM_ADMIN_EMAILS }}
+          WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE: ${{ secrets.WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE }}
+          WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG: ${{ secrets.WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG }}
         run: |
           if [ "${SKIP_ENV_CHECK}" = "true" ]; then
             echo "::warning::skip_env_check is set — writing api.env without validating required secrets. Missing values will be blank; the API container will fail its healthcheck until real secrets are set. Use only to test SSH/rsync/deploy.sh." >&2
@@ -166,6 +168,10 @@ jobs:
             echo "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}"
             echo "GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}"
             echo "PLATFORM_ADMIN_EMAILS=${PLATFORM_ADMIN_EMAILS}"
+            # Optional — blank leaves driver assignment notifications dormant
+            # (see src/config.ts). Set once the template is approved on the WABA.
+            echo "WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE=${WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE}"
+            echo "WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG=${WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG}"
           } > /tmp/api.env
           chmod 600 /tmp/api.env
 

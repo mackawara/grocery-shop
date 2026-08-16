@@ -2,12 +2,10 @@ import { logger } from '../../services/logger.ts';
 import whatsappMessager from './outgoingMessages.ts';
 import OrderModel from '../../models/Order.ts';
 import { getRedisHashValue } from '../redis/redis.controller.ts';
-import {
-  PaymentMethod,
-  DeliveryMethod,
-  PaymentStatus,
-  DeliveryStatus,
-} from '../../constants/models.ts';
+import { PaymentMethod, DeliveryMethod, PaymentStatus } from '../../constants/models.ts';
+import { ensureOrderDelivery } from '../delivery/orderDelivery.ts';
+import { getDeliveryByOrderNumber } from '../../delivery/index.ts';
+import { requireTenantId } from '../../context/tenantContext.ts';
 import { sanitizeText, sanitizePhone } from '../../utils/sanitize.ts';
 import type { OrderFlowResponse } from '../../constants/orderFlow.ts';
 import { promptForLocation } from '../delivery/deliveryFlowHandler.ts';
@@ -100,31 +98,30 @@ export const orderFlowHandler = async (from: string, payload: OrderFlowResponse)
       order.paymentDetails.mobileNumber = ecocashNumber;
     }
 
-    if (deliveryMethod) {
-      order.deliveryDetails = {
-        method: deliveryMethod,
-        status: order.deliveryDetails?.status ?? DeliveryStatus.PENDING,
-        address: order.deliveryDetails?.address,
-      };
-    }
-
+    // Resolve the address before the job is touched, so the job can be created
+    // complete rather than created and then patched.
+    let addressId: Types.ObjectId | undefined;
     if (deliveryMethod === DeliveryMethod.DOOR_DELIVERY && typedAddress) {
       const user = await resolveUserByPhone(from);
       const userId = user._id as Types.ObjectId;
-      const addressId = await resolveDeliveryAddress({
+      const existing = await getDeliveryByOrderNumber(requireTenantId('order flow'), orderNumber);
+      addressId = await resolveDeliveryAddress({
         userId,
-        existingAddressId: order.deliveryDetails?.address as Types.ObjectId | undefined,
+        existingAddressId: existing?.address,
         typed: typedAddress,
       });
       order.user = userId;
-      order.deliveryDetails = {
-        ...order.deliveryDetails,
-        address: addressId,
-      } as typeof order.deliveryDetails;
     }
 
     await order.save();
     logger.info(`[ORDER_FLOW] Order ${orderNumber} updated with flow details for ${from}`);
+
+    // The customer has chosen how they want the order, so the fulfilment job
+    // exists from here on — it is what the shop's delivery board works from and
+    // where the method, address, quote, driver and lifecycle all live.
+    if (deliveryMethod) {
+      await ensureOrderDelivery(order, deliveryMethod, addressId);
+    }
 
     // For door delivery we still need the GPS pin — Zim addresses aren't
     // reliably geocodable, so the typed address alone won't get the driver

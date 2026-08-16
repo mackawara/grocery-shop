@@ -1,9 +1,9 @@
 import { logger } from '../../services/logger.ts';
 import whatsappMessager from '../whatsapp/outgoingMessages.ts';
-import OrderModel from '../../models/Order.ts';
 import DeliveryAddressModel from '../../models/DeliveryAddress.ts';
 import Tenant from '../../models/Tenant.ts';
-import { getTenantId } from '../../context/tenantContext.ts';
+import { getTenantId, requireTenantId } from '../../context/tenantContext.ts';
+import { getDeliveryByOrderNumber } from '../../delivery/index.ts';
 import { getRedisHashValue, setRedisHashKeyValuePair } from '../redis/redis.controller.ts';
 import { quoteAndConfirmDelivery } from './deliveryQuote.controller.ts';
 
@@ -75,15 +75,16 @@ export const handleDeliveryLocation = async (
       return;
     }
 
-    const order = await OrderModel.findOne({ orderNumber })
-      .select('deliveryDetails.address')
-      .lean();
-    if (!order) {
-      logger.warn(`${TAG} Order ${orderNumber} not found for ${from}`);
+    // The drop-off address belongs to the fulfilment job, which the order flow
+    // created when the customer chose door delivery.
+    const tenantId = requireTenantId('delivery location');
+    const delivery = await getDeliveryByOrderNumber(tenantId, orderNumber);
+    if (!delivery) {
+      logger.warn(`${TAG} Order ${orderNumber} has no delivery job for ${from}`);
       return;
     }
 
-    const addressId = order.deliveryDetails?.address;
+    const addressId = delivery.address;
     if (!addressId) {
       logger.warn(`${TAG} Order ${orderNumber} has no address ref — typed address never saved?`);
       return;
