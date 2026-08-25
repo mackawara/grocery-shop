@@ -1,5 +1,4 @@
 import { logger } from '../../services/logger.ts';
-import { runWithTenant } from '../../context/tenantContext.ts';
 import type { IMoney } from '../../models/Product.ts';
 import {
   ProductAvailability,
@@ -9,7 +8,6 @@ import {
 } from '../../constants/models.ts';
 import { createProduct } from './product.service.ts';
 import type { CreateProductInput } from './product.service.ts';
-import { syncTenantCatalog } from './catalogSync.controller.ts';
 
 const TAG = '[CATALOG_IMPORT]';
 
@@ -105,7 +103,7 @@ const collectLabels = (row: FeedRow): string[] | undefined => {
 
 /**
  * Map one keyed feed row to a CreateProductInput. Imported products are ACTIVE
- * (auto-sync). Missing weight/minVehicle is fine — those gate delivery
+ * and appear in the next scheduled feed fetch. Missing weight/minVehicle is fine — those gate delivery
  * readiness, not import. Throws if a Meta-required field is missing/unparseable.
  */
 export const mapFeedRowToInput = (row: FeedRow): CreateProductInput => {
@@ -165,9 +163,9 @@ export interface ImportResult {
 }
 
 /**
- * Import a batch of keyed feed rows for a tenant. Each row is created ACTIVE
- * with sync deferred; after all rows are in, one batched sync pushes the whole
- * lot to Meta. Per-row failures are collected so a bad row never aborts the run.
+ * Import a batch of keyed feed rows for a tenant. Each row is created ACTIVE;
+ * Meta sees the resulting state on its next scheduled feed fetch. Per-row
+ * failures are collected so a bad row never aborts the run.
  */
 export const importProducts = async (tenantId: string, rows: FeedRow[]): Promise<ImportResult> => {
   const result: ImportResult = { total: rows.length, created: 0, failed: [] };
@@ -176,7 +174,7 @@ export const importProducts = async (tenantId: string, rows: FeedRow[]): Promise
     const row = rows[i];
     try {
       const input = mapFeedRowToInput(row);
-      await createProduct(tenantId, input, { deferSync: true });
+      await createProduct(tenantId, input);
       result.created += 1;
     } catch (error) {
       result.failed.push({
@@ -188,15 +186,6 @@ export const importProducts = async (tenantId: string, rows: FeedRow[]): Promise
   }
 
   logger.info(`${TAG} imported ${result.created}/${result.total} (failed=${result.failed.length})`);
-
-  // One batched push for everything just created (fire-and-forget). If it
-  // errors, products stay PENDING/ERROR until retried explicitly — see the
-  // sync-endpoint TODO on syncAllPendingCatalogs.
-  if (result.created > 0) {
-    void runWithTenant(tenantId, () => syncTenantCatalog()).catch((error) => {
-      logger.error(`${TAG} post-import sync failed: ${error}`);
-    });
-  }
 
   return result;
 };

@@ -14,6 +14,7 @@ import {
   updateProduct,
   publishProduct,
   archiveProduct,
+  markProductOutOfStock,
   getProduct,
   listProducts,
   ProductNotFoundError,
@@ -193,6 +194,15 @@ export const archiveProductHandler = async (req: Request, res: Response): Promis
   }
 };
 
+export const markProductOutOfStockHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const product = await markProductOutOfStock(tenantOf(res), String(req.params.productId));
+    res.status(200).json({ product });
+  } catch (error) {
+    handleError(error, res);
+  }
+};
+
 // Meta image rules we can enforce server-side before hosting the file.
 const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/gif']);
 const MIN_IMAGE_DIMENSION = 500;
@@ -232,7 +242,7 @@ export const uploadProductImageHandler = async (req: Request, res: Response): Pr
 
 // Bulk import from an uploaded Meta catalog-feed workbook (.xlsx). multer puts
 // the file buffer on req.file (see route). Products are created ACTIVE and
-// synced to Meta via the Batch API afterwards.
+// exposed to Meta through the tenant's scheduled feed afterwards.
 export const importProductsHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: 'No file uploaded (expected form field "file").' });

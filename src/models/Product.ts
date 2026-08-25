@@ -84,24 +84,25 @@ export interface ProductFields {
   dimensions?: IProductDimensions; // centimetres
   minVehicle?: VehicleTier;
 
-  // Lifecycle. Drives sync (ACTIVE→push, ARCHIVED→delete, DRAFT→skip).
+  // Lifecycle. The complete-replacement feed includes ACTIVE products and omits
+  // ARCHIVED/DRAFT products.
   status: ProductStatus;
 }
 
 export interface IProduct extends ProductFields, Document {
   tenantId: Types.ObjectId;
 
-  // --- Meta catalog sync metadata (owned by the sync layer, not callers) ---
+  // --- Legacy per-item Meta sync metadata (not caller-writable) ---
+  // Retained for backwards-compatible reads of existing rows. Scheduled-feed
+  // writes reset syncStatus to NOT_SYNCED and do not update the other fields.
   fbItemId?: string; // Meta's id for the synced item
   syncStatus: CatalogSyncStatus;
   lastSyncedAt?: Date;
   lastSyncError?: string;
-  // Hash of the exported Meta payload; lets the sync worker skip no-op pushes.
+  // Hash previously used by the retired per-item sync worker.
   contentHash?: string;
 
-  // From { timestamps: true }. The sync worker uses updatedAt as an optimistic
-  // guard: its write-backs are conditional on the updatedAt it read, so a
-  // concurrent vendor edit (which bumps updatedAt) wins over stale sync state.
+  // From { timestamps: true }.
   createdAt: Date;
   updatedAt: Date;
 }
@@ -212,14 +213,16 @@ const ProductSchema = new Schema<IProduct>(
 
 // Retailer id (sku) is unique per tenant — this is the key Meta dedupes on.
 ProductSchema.index({ tenantId: 1, sku: 1 }, { unique: true });
-// Sync worker scans for tenant products that still need pushing.
+// Scheduled feed reads one tenant's ACTIVE products in SKU order.
+ProductSchema.index({ tenantId: 1, status: 1, sku: 1 });
+// Retained while legacy sync metadata remains queryable through the dashboard.
 ProductSchema.index({ tenantId: 1, syncStatus: 1 });
 
 ProductSchema.plugin(tenantScope);
 
-// The Meta-required product fields that must be present before a product can be
-// pushed to the catalog. `link` is not here — it comes from the tenant's
-// facebookPageUrl and is checked at sync time, not on the product itself.
+// The Meta-required product fields that must be present before a product can
+// appear in the scheduled feed. `link` is not stored here — the feed generates
+// an exact public product URL from the tenant slug and SKU.
 const SYNC_REQUIRED_FIELDS = [
   'sku',
   'title',
@@ -238,9 +241,9 @@ export interface ProductSyncReadiness {
 /**
  * Whether a product has everything Meta requires to be synced, and if not,
  * which fields are missing. Pure and side-effect free so it can back both the
- * sync worker (skip non-ready products) and the dashboard (tell the tenant why
- * a DRAFT isn't live). Tenant-level prerequisites (facebookPageUrl for `link`)
- * are validated separately at sync time.
+ * feed builder (skip non-ready legacy rows) and the dashboard (tell the tenant
+ * why a DRAFT cannot be published). Feed-level context such as `link` is
+ * supplied separately by the exporter.
  */
 export const getProductSyncReadiness = (
   product: Pick<IProduct, (typeof SYNC_REQUIRED_FIELDS)[number]>,

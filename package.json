@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "start": "node dist/index.js",
     "build": "tsc",
+    "test": "tsx --test test/*.test.ts",
     "dev": "nodemon --exec tsx ./src/index.ts",
     "seed:local": "tsx ./src/scripts/seedLocalTenant.ts",
     "ngrok": "ngrok http --domain=relaxed-bee-active.ngrok-free.app 3000",

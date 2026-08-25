@@ -19,6 +19,7 @@ import {
   updateProductHandler,
   publishProductHandler,
   archiveProductHandler,
+  markProductOutOfStockHandler,
   importProductsHandler,
   uploadProductImageHandler,
 } from '../controllers/catalog/product.controller.ts';
@@ -164,6 +165,7 @@ router.get(`${PRODUCTS}/:productId`, ...catalog, getProductHandler);
 router.patch(`${PRODUCTS}/:productId`, ...catalogWrite, updateProductHandler);
 router.post(`${PRODUCTS}/:productId/publish`, ...catalogWrite, publishProductHandler);
 router.post(`${PRODUCTS}/:productId/archive`, ...catalogWrite, archiveProductHandler);
+router.post(`${PRODUCTS}/:productId/out-of-stock`, ...catalogWrite, markProductOutOfStockHandler);
 
 // Delivery config — session-scoped like the rest of /dashboard. `config` is just
 // the auth resolver (tenant comes from the session, never the URL); reads are
