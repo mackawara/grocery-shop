@@ -107,9 +107,12 @@ export interface MetaBatchRequest {
 // without editing a hand-kept list. Accepts leans/DTOs, not just hydrated docs.
 type ProductForMeta = Omit<ProductFields, 'status' | 'dimensions' | 'minVehicle'>;
 
-// The tenant fields the exporter needs: `facebookPageUrl` is the product `link`;
+// The context fields the exporter needs. Scheduled feeds provide an exact
+// `productLink`; the legacy Batch API helper accepts `facebookPageUrl` for
+// backwards compatibility.
 // `displayName` is the brand fallback when a product has no brand of its own.
 export interface MetaExportTenant {
+  productLink?: string;
   facebookPageUrl?: string;
   displayName: string;
 }
@@ -125,10 +128,11 @@ export class ProductNotSyncableError extends Error {
 }
 
 /**
- * Build the Meta `data` object for one product. `link` comes from the tenant's
- * facebookPageUrl (WhatsApp commerce has no per-product page). Throws
+ * Build the Meta `data` object for one product. Scheduled feeds supply an exact
+ * per-product `productLink`; the legacy Batch API helper falls back to the
+ * tenant's `facebookPageUrl` for backwards compatibility. Throws
  * ProductNotSyncableError if the product is missing Meta-required fields or the
- * tenant has no facebookPageUrl — CREATE/UPDATE must never ship a partial item.
+ * caller has no product link.
  */
 export const toMetaProductData = (
   product: ProductForMeta,
@@ -136,8 +140,9 @@ export const toMetaProductData = (
 ): MetaProductData => {
   const readiness = getProductSyncReadiness(product);
   const reasons = [...readiness.missing];
-  if (!tenant.facebookPageUrl) {
-    reasons.push('tenant.facebookPageUrl');
+  const productLink = tenant.productLink ?? tenant.facebookPageUrl;
+  if (!productLink) {
+    reasons.push('product.link');
   }
   if (reasons.length > 0) {
     throw new ProductNotSyncableError(product.sku, reasons);
@@ -150,7 +155,7 @@ export const toMetaProductData = (
     availability: AVAILABILITY_TO_META[product.availability],
     condition: CONDITION_TO_META[product.condition],
     price: formatMoney(product.price),
-    link: tenant.facebookPageUrl as string,
+    link: productLink as string,
     image_link: product.imageLink as string,
     // brand is required for most Meta categories; fall back to the tenant's name.
     brand: product.brand ?? tenant.displayName,

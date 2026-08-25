@@ -11,6 +11,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import catalogRoutes from './routes/catalog.routes.js';
 import { csrfGuard } from './controllers/middleware/csrf.js';
 import type { RawBodyRequest } from './controllers/middleware/verifyWhatsappSignature.js';
 import cors from 'cors';
@@ -59,6 +60,12 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// Public, read-only catalog surfaces. Registered before sessions so Meta's
+// scheduled feed fetches and customer product-page views never touch Redis.
+// Each request resolves exactly one active tenant, then re-enters runWithTenant
+// before reading products (see catalogFeed.controller).
+app.use('/catalogs', catalogRoutes);
+
 // Server-side session (Redis-backed). The browser only holds the signed cookie;
 // OIDC tokens live in Redis, never in JS.
 app.use(
@@ -103,7 +110,7 @@ app.get('/', (req: Request, res: Response) => {
 // default handler which will destroy the socket.
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
   logger.error(
-    `[unhandled] ${req.method} ${req.originalUrl}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+    `[unhandled] ${req.method} ${req.originalUrl}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`,
   );
   if (res.headersSent) {
     next(err);

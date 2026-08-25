@@ -1,19 +1,14 @@
-import type { Types } from 'mongoose';
 import { logger } from '../../services/logger.ts';
-import { requireTenantId, runWithTenant } from '../../context/tenantContext.ts';
+import { runWithTenant } from '../../context/tenantContext.ts';
 import ProductModel, { getProductSyncReadiness } from '../../models/Product.ts';
 import type { IProduct, ProductFields } from '../../models/Product.ts';
-import { ProductStatus, CatalogSyncStatus } from '../../constants/models.ts';
-import { syncTenantCatalog } from './catalogSync.controller.ts';
+import { ProductAvailability, ProductStatus, CatalogSyncStatus } from '../../constants/models.ts';
 
 const TAG = '[PRODUCT]';
 
-// Tenant-scoped product CRUD. Owns the catalog source of truth and the sync
-// lifecycle: every write recomputes the product's syncStatus from its lifecycle
-// status and, when that queues a push, nudges an immediate sync. Failed pushes
-// stay PENDING/ERROR until retried explicitly — see the sync-endpoint TODO on
-// syncAllPendingCatalogs. All reads/writes go through the tenantScope-plugged
-// model, so they are automatically scoped to the current tenant context.
+// Tenant-scoped product CRUD. MongoDB is the source of truth; Meta periodically
+// fetches the public complete-replacement feed, so product writes never depend
+// on a Graph API call. All reads/writes go through the tenantScope-plugged model.
 
 // The caller-writable field set is the model's canonical ProductFields —
 // tenantId (stamped by the plugin), sync metadata, and timestamps are excluded
@@ -45,41 +40,27 @@ export class ProductNotPublishableError extends Error {
   }
 }
 
-// Recompute syncStatus from lifecycle status:
-//  ACTIVE   -> should be live  -> PENDING (but must be sync-ready first)
-//  ARCHIVED -> should be gone  -> PENDING (a DELETE)
-//  DRAFT    -> not published   -> NOT_SYNCED (never queued)
-const applySyncState = (product: IProduct): void => {
-  switch (product.status) {
-    case ProductStatus.ACTIVE: {
-      const readiness = getProductSyncReadiness(product);
-      if (!readiness.ready) {
-        throw new ProductNotPublishableError(product.sku, readiness.missing);
-      }
-      product.syncStatus = CatalogSyncStatus.PENDING;
-      break;
-    }
-    case ProductStatus.ARCHIVED:
-      product.syncStatus = CatalogSyncStatus.PENDING;
-      break;
-    default:
-      product.syncStatus = CatalogSyncStatus.NOT_SYNCED;
+// Keep quantity and availability consistent. Restocking is explicit: increasing
+// quantity does not automatically make a deliberately unavailable item live.
+export const applyInventoryState = (product: Pick<IProduct, 'quantity' | 'availability'>): void => {
+  if (product.quantity === 0) {
+    product.availability = ProductAvailability.OUT_OF_STOCK;
   }
 };
 
-// Fire-and-forget an immediate push when a write queued one. Detached from the
-// request, so re-enter the tenant context explicitly; failures are logged and
-// the product stays PENDING until an explicit retry (see the sync-endpoint
-// TODO on syncAllPendingCatalogs).
-const triggerSyncIfQueued = (product: IProduct): void => {
-  if (product.syncStatus !== CatalogSyncStatus.PENDING) {
-    return;
+// Validate ACTIVE feed readiness and retire the legacy per-item push state. A
+// scheduled feed has no per-row acknowledgement, so claiming SYNCED/PENDING here
+// would be misleading; ingestion status belongs in Meta Commerce Manager.
+const applyFeedState = (product: IProduct): void => {
+  applyInventoryState(product);
+  if (product.status === ProductStatus.ACTIVE) {
+    const readiness = getProductSyncReadiness(product);
+    if (!readiness.ready) {
+      throw new ProductNotPublishableError(product.sku, readiness.missing);
+    }
   }
-  const tenantId = requireTenantId('triggerSyncIfQueued');
-  const id = (product._id as Types.ObjectId).toString();
-  void runWithTenant(tenantId, () => syncTenantCatalog({ productIds: [id] })).catch((error) => {
-    logger.error(`${TAG} background sync failed for ${product.sku}: ${error}`);
-  });
+  product.syncStatus = CatalogSyncStatus.NOT_SYNCED;
+  product.lastSyncError = undefined;
 };
 
 // Every operation takes an explicit tenantId and runs its body inside
@@ -87,21 +68,12 @@ const triggerSyncIfQueued = (product: IProduct): void => {
 // never depends on an ambient caller context. Callers (HTTP handlers, the
 // importer, scripts, jobs) just pass the tenant they're acting for.
 
-export const createProduct = (
-  tenantId: string,
-  input: CreateProductInput,
-  options?: { deferSync?: boolean },
-): Promise<IProduct> =>
+export const createProduct = (tenantId: string, input: CreateProductInput): Promise<IProduct> =>
   runWithTenant(tenantId, async () => {
     const product = new ProductModel(input); // tenantId stamped by tenantScope on save
-    applySyncState(product);
+    applyFeedState(product);
     await product.save();
     logger.info(`${TAG} created ${product.sku} (status=${product.status})`);
-    // Bulk callers (the importer) defer the push and sync once at the end so a
-    // large import is one batched API call instead of N fire-and-forgets.
-    if (!options?.deferSync) {
-      triggerSyncIfQueued(product);
-    }
     return product;
   });
 
@@ -116,21 +88,26 @@ export const updateProduct = (
       throw new ProductNotFoundError(id);
     }
     Object.assign(product, patch);
-    applySyncState(product);
+    applyFeedState(product);
     await product.save();
     logger.info(`${TAG} updated ${product.sku}`);
-    triggerSyncIfQueued(product);
     return product;
   });
 
 // Publish a draft: DRAFT -> ACTIVE. Throws ProductNotPublishableError if the
-// product is missing Meta-required fields (applySyncState enforces readiness).
+// product is missing Meta-required fields (applyFeedState enforces readiness).
 export const publishProduct = (tenantId: string, id: string): Promise<IProduct> =>
   updateProduct(tenantId, id, { status: ProductStatus.ACTIVE });
 
-// Archive: -> ARCHIVED, which queues a DELETE from the Meta catalog on next sync.
+// Archive: -> ARCHIVED, which omits the item from the next complete feed refresh.
 export const archiveProduct = (tenantId: string, id: string): Promise<IProduct> =>
   updateProduct(tenantId, id, { status: ProductStatus.ARCHIVED });
+
+export const markProductOutOfStock = (tenantId: string, id: string): Promise<IProduct> =>
+  updateProduct(tenantId, id, {
+    availability: ProductAvailability.OUT_OF_STOCK,
+    quantity: 0,
+  });
 
 export const getProduct = (tenantId: string, id: string): Promise<IProduct | null> =>
   runWithTenant(tenantId, async () => ProductModel.findById(id)); // tenant-scoped
