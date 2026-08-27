@@ -5,7 +5,8 @@ Caddy terminates TLS and proxies to loopback ports. This directory is the
 source of truth for the stack; the API deploy workflow rsyncs it to
 `/home/ubuntu/repos/saas` on every deploy (`.env` on the server is never
 overwritten by the sync). `api.env` is generated fresh on **every** API
-deploy from GitHub secrets — see [Application secrets](#application-secrets-apienv)
+deploy from GitHub secrets and variables — see
+[Application config](#application-config-apienv)
 below; it's excluded from the rsync only because it's written by its own
 step, not because it's hand-maintained.
 
@@ -31,9 +32,10 @@ it) — changing the API URL requires a rebuild, not a restart.
    ```
 
 3. `api.env` needs no manual setup — the grocery-shop `Deploy API` workflow
-   writes it from GitHub secrets on every run, before `deploy.sh` starts (see
-   [Application secrets](#application-secrets-apienv) below). Just make sure
-   those secrets are populated in GitHub before the first deploy.
+   writes it from GitHub secrets and variables on every run, before
+   `deploy.sh` starts (see [Application config](#application-config-apienv)
+   below). Just make sure those are populated in GitHub before the first
+   deploy.
 4. Add an SSH keypair for deploys: private key → GitHub secret
    `SSH_PRIVATE_KEY` (in both repos), public key → the deploy user's
    `authorized_keys`.
@@ -61,8 +63,12 @@ it) — changing the API URL requires a rebuild, not a restart.
 | secret   | `SSH_PRIVATE_KEY`    | deploy key (PEM)                      |
 | secret   | `SSH_HOST`           | server hostname/IP                    |
 | secret   | `SSH_USER`           | deploy user                           |
-| secret   | `DOCKERHUB_USERNAME` | Docker Hub username                   |
-| secret   | `DEPLOY_PATH`        | optional, default `/home/ubuntu/repos/saas` |
+| variable | `DOCKERHUB_USERNAME` | Docker Hub username                   |
+| variable | `DEPLOY_PATH`        | optional, default `/home/ubuntu/repos/saas` |
+
+`SSH_HOST` and `SSH_USER` are not credentials on their own, but they stay
+secrets so a public Actions log never prints a ready-made `user@host` SSH
+target.
 
 grocery-DASHBOARD additionally needs:
 
@@ -70,50 +76,59 @@ grocery-DASHBOARD additionally needs:
 | ------ | ------------------- | ---------------------------------------- |
 | secret | `VITE_API_BASE_URL` | e.g. `https://api.ventatech.duckdns.org` |
 
-## Application secrets (`api.env`)
+## Application config (`api.env`)
 
-grocery-shop only. Each `src/config.ts` value is its own GitHub secret so a
-single credential can be rotated (update the secret, redeploy) without
-touching any of the others. The **Write api.env from secrets** step in
-`deploy.yml` assembles them into `api.env` and copies it to the server before
-`deploy.sh` runs — never edit `api.env` by hand on the server, it's
-overwritten on every deploy.
+grocery-shop only. Each `src/config.ts` value is its own GitHub entry so a
+single one can be rotated (update it, redeploy) without touching any of the
+others. The **Write api.env from secrets and variables** step in `deploy.yml`
+assembles them into `api.env` and copies it to the server before `deploy.sh`
+runs — never edit `api.env` by hand on the server, it's overwritten on every
+deploy.
 
-| Secret                                 | Required | Notes                                                              |
-| --------------------------------------- | -------- | -------------------------------------------------------------------- |
-| `MONGODB_USERNAME`                      | yes      |                                                                      |
-| `MONGODB_PASSWORD`                      | yes      |                                                                      |
-| `MONGODB_HOST`                          | yes      |                                                                      |
-| `WHATSAPP_WEBHOOK_VERIFICATION_TOKEN`   | yes      |                                                                      |
-| `WHATSAPP_PHONE_NUMBER_ID`              | yes      |                                                                      |
-| `WHATSAPP_SYSTEM_TOKEN`                 | yes      |                                                                      |
-| `WHATSAPP_FLOW_PRIVATE_KEY`             | yes      | PEM, single line with literal `\n` (not real newlines) — see `whatsappFlowCrypto.ts` |
-| `WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE`  | no       | only if the PEM above is encrypted                                 |
-| `CREDENTIAL_ENC_KEY`           | yes      | 32-byte AES-256 key, hex (`openssl rand -hex 32`). Encrypts per-tenant WhatsApp tokens at rest. **Rotating it invalidates every stored credential — vendors must reconnect.** |
-| `WHATSAPP_APP_SECRET`                   | yes      | Meta app secret (App Dashboard → Settings → Basic); HMAC key for webhook `X-Hub-Signature-256` verification |
-| `WHATSAPP_SIGNATURE_ENFORCE`            | no       | `true` = reject unsigned/mis-signed webhooks with 403. Unset/other = log-only. **Enable only after a clean log-only period** — a wrong app secret with this on rejects all inbound WhatsApp traffic. |
-| `PUBLIC_BASE_URL`                       | yes      | e.g. `https://api.ventatech.duckdns.org`                           |
-| `AUTHENTIK_ISSUER`                      | yes      |                                                                      |
-| `AUTHENTIK_CLIENT_ID`                   | yes      |                                                                      |
-| `AUTHENTIK_CLIENT_SECRET`               | yes      |                                                                      |
-| `AUTHENTIK_BASE_URL`                    | yes      |                                                                      |
-| `AUTHENTIK_ADMIN_TOKEN`                 | yes      |                                                                      |
-| `AUTHENTIK_RECOVERY_EMAIL_STAGE`        | no       | pk/slug of an Authentik email stage; **required for staff invitations** — see below |
-| `SESSION_SECRET`                        | yes      |                                                                      |
-| `DASHBOARD_URL`                         | yes      |                                                                      |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL`          | no       | only if product-image uploads to Drive are used                    |
-| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`    | no       | same format note as the WhatsApp Flow key — see `googleDrive.ts`   |
-| `GOOGLE_DRIVE_FOLDER_ID`                | no       |                                                                      |
-| `PLATFORM_ADMIN_EMAILS`                 | no       | comma-separated break-glass admin allowlist                        |
-| `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE`   | no       | name of the approved driver-assignment template — see below. Blank = drivers are not notified |
-| `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG` | no    | language code of that template; defaults to `en`                   |
+**Secret or variable?** Credentials — anything whose disclosure is itself a
+compromise — are **secrets**. Public identifiers, URLs and flags are
+**variables**: masking them buys nothing and actively hurts debugging, since
+GitHub redacts every occurrence of a secret's value in the log (a secret
+`DOCKERHUB_USERNAME` turns the deployed image into `***/grocery-shop-api`,
+and short values like `true` or `en` either garble unrelated output or aren't
+masked at all). Variables are also readable in the repo settings UI, so you
+can confirm what actually shipped. When in doubt, make it a secret.
 
-`APP_ENV` and `REDIS_HOST_PORT` are hardcoded in the workflow, not secrets
-(always `production` / `6379` in this stack). `PORT` and `REDIS_HOST` are
-injected by `docker-compose.yml` directly — never set any of these four in a
-secret.
+| Kind     | Name                                   | Required | Notes                                                              |
+| -------- | --------------------------------------- | -------- | ------------------------------------------------ |
+| secret | `MONGODB_USERNAME`                      | yes      |                                                                      |
+| secret | `MONGODB_PASSWORD`                      | yes      |                                                                      |
+| secret | `MONGODB_HOST`                          | yes      |                                                                      |
+| secret | `WHATSAPP_WEBHOOK_VERIFICATION_TOKEN`   | yes      |                                                                      |
+| variable | `WHATSAPP_PHONE_NUMBER_ID`              | yes      |                                                                      |
+| secret | `WHATSAPP_SYSTEM_TOKEN`                 | yes      |                                                                      |
+| secret | `WHATSAPP_FLOW_PRIVATE_KEY`             | yes      | PEM, single line with literal `\n` (not real newlines) — see `whatsappFlowCrypto.ts` |
+| secret | `WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE`  | no       | only if the PEM above is encrypted                                 |
+| secret | `CREDENTIAL_ENC_KEY`           | yes      | 32-byte AES-256 key, hex (`openssl rand -hex 32`). Encrypts per-tenant WhatsApp tokens at rest. **Rotating it invalidates every stored credential — vendors must reconnect.** |
+| secret | `WHATSAPP_APP_SECRET`                   | yes      | Meta app secret (App Dashboard → Settings → Basic); HMAC key for webhook `X-Hub-Signature-256` verification |
+| variable | `WHATSAPP_SIGNATURE_ENFORCE`            | no       | `true` = reject unsigned/mis-signed webhooks with 403. Unset/other = log-only. **Enable only after a clean log-only period** — a wrong app secret with this on rejects all inbound WhatsApp traffic. |
+| variable | `PUBLIC_BASE_URL`                       | yes      | e.g. `https://api.ventatech.duckdns.org`                           |
+| variable | `AUTHENTIK_ISSUER`                      | yes      |                                                                      |
+| variable | `AUTHENTIK_CLIENT_ID`                   | yes      |                                                                      |
+| secret | `AUTHENTIK_CLIENT_SECRET`               | yes      |                                                                      |
+| variable | `AUTHENTIK_BASE_URL`                    | yes      |                                                                      |
+| secret | `AUTHENTIK_ADMIN_TOKEN`                 | yes      |                                                                      |
+| variable | `AUTHENTIK_RECOVERY_EMAIL_STAGE`        | no       | pk/slug of an Authentik email stage; **required for staff invitations** — see below |
+| secret | `SESSION_SECRET`                        | yes      |                                                                      |
+| variable | `DASHBOARD_URL`                         | yes      |                                                                      |
+| variable | `GOOGLE_SERVICE_ACCOUNT_EMAIL`          | no       | only if product-image uploads to Drive are used                    |
+| secret | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`    | no       | same format note as the WhatsApp Flow key — see `googleDrive.ts`   |
+| variable | `GOOGLE_DRIVE_FOLDER_ID`                | no       |                                                                      |
+| secret | `PLATFORM_ADMIN_EMAILS`                 | no       | comma-separated break-glass admin allowlist. Not a credential, but a variable would publish exactly whom to phish to bypass the dashboard |
+| variable | `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE`   | no       | name of the approved driver-assignment template — see below. Blank = drivers are not notified |
+| variable | `WHATSAPP_DRIVER_ASSIGNMENT_TEMPLATE_LANG` | no    | language code of that template; defaults to `en`                   |
 
-**Fail-fast by design:** the workflow step checks every *required* secret
+`APP_ENV` and `REDIS_HOST_PORT` are hardcoded in the workflow (always
+`production` / `6379` in this stack). `PORT` and `REDIS_HOST` are injected by
+`docker-compose.yml` directly — `PORT` from the server's own `.env`, not from
+`api.env` — so never set any of these four as a secret or a variable.
+
+**Fail-fast by design:** the workflow step checks every *required* entry
 above is non-empty and stops the job — before touching the server at all — if
 one is missing. This matters because `deploy.sh`'s automatic rollback
 re-deploys the previous image tag but reads the *same* `api.env` on disk; a

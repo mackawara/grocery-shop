@@ -73,7 +73,7 @@ Implications when developing:
 - Containers publish **loopback-only** ports; never publish a port on `0.0.0.0`
   in the production compose file — Caddy is the sole public entry point.
 - A new required env var must also be added to the deploy workflow's `api.env`
-  generation (see `deploy/README.md` → Application secrets), or deploys fail.
+  generation (see `deploy/README.md` → Application config), or deploys fail.
 
 ---
 
