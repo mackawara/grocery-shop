@@ -37,6 +37,13 @@ export interface IVendorUser extends Document {
   // an INVITED seat until this is true (owners are treated as verified by
   // construction — see resolveVendorUser).
   phoneVerified: boolean;
+  // Proof that the person controls `email`, once the app has minted and mailed
+  // its own verification token. Vendor signup and invitations do NOT set this
+  // yet; they record authUserPk instead, and resolveMembership accepts that as
+  // an interim provenance fallback until issue #51 replaces it with first-party
+  // email verification.
+  emailVerified: boolean;
+  emailVerifiedAt?: Date;
   lastLoginAt?: Date;
 }
 
@@ -60,6 +67,8 @@ const VendorUserSchema = new Schema<IVendorUser>(
       index: true,
     },
     phoneVerified: { type: Boolean, default: false },
+    emailVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date },
     lastLoginAt: { type: Date },
   },
   { timestamps: true },

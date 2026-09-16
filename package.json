@@ -16,6 +16,8 @@
     "test": "tsx --test test/*.test.ts",
     "dev": "nodemon --exec tsx ./src/index.ts",
     "seed:local": "tsx ./src/scripts/seedLocalTenant.ts",
+    "admin:create": "tsx ./src/scripts/createPlatformAdmin.ts",
+    "auth:doctor": "tsx ./src/scripts/authDoctor.ts",
     "ngrok": "ngrok http --domain=relaxed-bee-active.ngrok-free.app 3000",
     "prepare": "husky"
   },

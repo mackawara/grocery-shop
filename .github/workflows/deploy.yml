@@ -134,6 +134,17 @@ jobs:
                 exit 1
               fi
             done
+
+            # Not mandatory (config.ts boots without it), but its absence is a
+            # silent, delayed failure rather than a loud one: approvals and staff
+            # invitations still return 200, the mail is simply never sent, and the
+            # vendor cannot set a password or complete first sign-in. Nothing
+            # surfaces that until someone reports they never got the email — so
+            # warn at deploy time. A warning, not an error, because a deployment
+            # that cannot mail is still a working deployment for everything else.
+            if [ -z "${AUTHENTIK_RECOVERY_EMAIL_STAGE}" ]; then
+              echo "::warning::AUTHENTIK_RECOVERY_EMAIL_STAGE is unset — approved vendors and invited staff will NOT receive their set-password email and cannot complete first sign-in. Set it to the pk of an Authentik email stage (yarn auth:doctor prints the candidates). See deploy/README.md → Authentik prerequisites." >&2
+            fi
           fi
 
           umask 077

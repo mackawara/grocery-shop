@@ -7,9 +7,16 @@ const TAG = '[AUTHENTIK]';
 
 // Thin, stateless wrapper over the Authentik admin API (served under
 // <base>/api/v3/). It knows nothing about tenants or Mongo — it only creates
-// and links identities/groups. The meaning "this group == that tenant" is owned
-// by the signup controller, which sets the tenant_id attribute, and read back by
-// the dashboard auth resolver. Keep all tenant/DB logic out of this file.
+// and links identities/groups. Keep all tenant/DB logic out of this file.
+//
+// NOTE on the per-tenant group: signup creates `tenant:<slug>` with a
+// `tenant_id` attribute, but nothing in this codebase ever reads that attribute
+// back. Authorization is resolved entirely from Mongo — the auth callback finds
+// the VendorUser and stamps its tenantId into the session, and
+// dashboardAuthResolver re-reads that row on every request. The group is
+// therefore an Authentik-side org chart (useful for targeting invitations and
+// for policies you configure in Authentik), NOT a source of authority here.
+// An earlier comment claimed the resolver read the tenant_id claim; it does not.
 
 // Subset of the Authentik group representation we consume. `pk` is the numeric
 // id used to add members; `attributes` carries our tenant link.
@@ -172,6 +179,24 @@ const sendRecoveryEmail = async (userPk: number): Promise<void> => {
   }
 };
 
+// Set a user's password directly (admin API), bypassing the recovery-email
+// round trip. The bootstrap path for an operator when SMTP is unavailable or the
+// recovery link cannot be delivered — without it, a freshly created account has
+// no usable password and there is no way in at all.
+//
+// The password is a secret: it is never logged here, and callers must not accept
+// it as a command-line argument (shell history and `ps` both leak argv). Returns
+// 204 on success; Authentik enforces its own password policy and answers 400 if
+// the value is rejected.
+const setPassword = async (userPk: number, password: string): Promise<void> => {
+  try {
+    await client.post(`/core/users/${userPk}/set_password/`, { password });
+    logger.info(`${TAG} set password for user pk ${userPk}`);
+  } catch (err) {
+    throw toAuthentikError('setPassword', err);
+  }
+};
+
 // Look up a user by exact email (the anchor). Returns the first match or null.
 // Lets callers reuse an existing Authentik identity instead of creating a
 // duplicate (e.g. provisioning a platform admin who already has an account).
@@ -214,6 +239,7 @@ export const authentik = {
   setUserActive,
   createRecoveryLink,
   sendRecoveryEmail,
+  setPassword,
   findUserByEmail,
   deleteUser,
   deleteGroup,

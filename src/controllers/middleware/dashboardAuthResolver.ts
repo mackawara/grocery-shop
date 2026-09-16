@@ -71,8 +71,10 @@ export const resolveVendorUser = async (
 };
 
 // Shared scaffolding for the authenticated dashboard middlewares. Reads the BFF
-// session identity, resolves the tenant from the tenant_id claim (fail closed on
-// status), then runs `handle` with the VendorResolution inside the tenant
+// session identity, resolves the tenant from the session's tenantId — which the
+// auth callback derived from the VendorUser row, NOT from any token claim
+// (Authentik carries no tenant or role claims) — fails closed on tenant status,
+// then runs `handle` with the VendorResolution inside the tenant
 // context. Each caller decides how to treat each resolution kind — the standard
 // gate denies `needs_activation`, the activation gate is the one place that
 // admits it. Returns after `handle` has written the response (or called next()).
@@ -119,9 +121,23 @@ export const withVendorSession = async (
 
   // Fail closed: only ACTIVE/TRIAL tenants get dashboard access (PENDING awaits
   // approval; REJECTED/SUSPENDED/INACTIVE are denied). Mirrors the WhatsApp resolver.
+  //
+  // PENDING carries a distinct `code` because it is not a denial, it is a queue:
+  // the owner signed up correctly and is waiting on a platform admin. Without it
+  // the SPA cannot tell "you are next in line" from "you have no access here",
+  // so a brand-new vendor's first successful sign-in dead-ended on a flat 403.
+  // Every other status stays a bare denial — we do not tell a rejected or
+  // suspended applicant which of the two they are.
   const ALLOWED_STATUSES = [TenantStatus.ACTIVE, TenantStatus.TRIAL];
   if (!ALLOWED_STATUSES.includes(tenant.status)) {
     logger.warn(`${TAG} tenant ${tenant._id} is ${tenant.status} — denying`);
+    if (tenant.status === TenantStatus.PENDING) {
+      res.status(403).json({
+        error: 'Your account is awaiting approval.',
+        code: 'approval_pending',
+      });
+      return;
+    }
     res.status(403).json({ error: 'This account is not active.' });
     return;
   }

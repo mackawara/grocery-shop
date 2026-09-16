@@ -46,7 +46,14 @@ export const listTenants = async (_req: Request, res: Response): Promise<void> =
 // inside the tenant context; its authUserPk (stamped at signup) is the admin-API
 // handle. Throws on any failure so callers decide how to surface it.
 const sendOwnerRecoveryEmail = async (tenant: ITenant): Promise<void> => {
-  await runWithTenant(
+  await withOwnerPk(tenant, (pk) => authentik.sendRecoveryEmail(pk));
+};
+
+// Resolve the owner's Authentik pk inside the tenant context and hand it to
+// `use`. Shared by the email send and the link fallback so both agree on which
+// account they act on.
+const withOwnerPk = async <T>(tenant: ITenant, use: (pk: number) => Promise<T>): Promise<T> =>
+  runWithTenant(
     tenant._id as Types.ObjectId,
     async () => {
       const owner = await VendorUser.findOne({ role: UserRole.VENDOR });
@@ -56,10 +63,56 @@ const sendOwnerRecoveryEmail = async (tenant: ITenant): Promise<void> => {
       if (owner.authUserPk === undefined) {
         throw new Error('owner VendorUser has no authUserPk');
       }
-      await authentik.sendRecoveryEmail(owner.authUserPk);
+      return use(owner.authUserPk);
     },
     tenant.slug,
   );
+
+// Fallback for when Authentik cannot deliver the mail itself — most commonly
+// because no email stage is configured (AUTHENTIK_RECOVERY_EMAIL_STAGE unset or
+// stale). Asks Authentik for the same one-time set-password link it would have
+// emailed, so the operator can pass it to the vendor out of band rather than the
+// signup dead-ending at "approved but nobody can log in".
+//
+// This is deliberately a FALLBACK, returned only after a send failure: the link
+// is a bearer credential, so the fewer paths that surface it the better. It is
+// single-use and expires on Authentik's own schedule, it is shown only to an
+// authenticated platform admin acting on a tenant they just approved (the same
+// capability Authentik's own admin UI exposes), and it is never logged.
+const ownerRecoveryLink = async (tenant: ITenant): Promise<string | undefined> => {
+  try {
+    return await withOwnerPk(tenant, (pk) => authentik.createRecoveryLink(pk));
+  } catch (err) {
+    logger.error(
+      `${TAG} could not mint recovery link for ${tenant.slug}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return undefined;
+  }
+};
+
+type RecoveryOutcome =
+  | { status: 'queued' }
+  | { status: 'link_only'; link: string }
+  | { status: 'failed' };
+
+const resolveOwnerRecovery = async (
+  tenant: ITenant,
+  logLabel: string,
+): Promise<RecoveryOutcome> => {
+  try {
+    await sendOwnerRecoveryEmail(tenant);
+    return { status: 'queued' };
+  } catch (err) {
+    logger.error(
+      `${TAG} ${logLabel} failed for ${tenant.slug}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    const link = await ownerRecoveryLink(tenant);
+    return link ? { status: 'link_only', link } : { status: 'failed' };
+  }
 };
 
 // Flip a PENDING tenant to a terminal signup outcome. Only PENDING tenants are a
@@ -97,26 +150,30 @@ const transitionPendingTenant = async (
   );
 
   // On approval, send the owner their recovery email. The status flip already
-  // committed, so an email failure is non-fatal: keep the approval, log it, and
-  // flag it so the operator can re-send (POST .../resend-invite).
+  // committed, so an email failure is non-fatal: keep the approval and surface
+  // the exact recovery outcome to the operator.
   let emailWarning: string | undefined;
+  let recoveryLink: string | undefined;
   if (next === TenantStatus.TRIAL) {
-    try {
-      await sendOwnerRecoveryEmail(tenant);
-    } catch (err) {
-      emailWarning = 'Approved, but the recovery email could not be sent. Use resend-invite.';
-      logger.error(
-        `${TAG} recovery email failed for ${tenant.slug}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+    const recovery = await resolveOwnerRecovery(tenant, 'recovery email');
+    if (recovery.status === 'link_only') {
+      emailWarning =
+        'Approved, but the recovery email could not be sent. Give the owner this one-time link, or fix email delivery and use resend-invite.';
+      recoveryLink = recovery.link;
+    } else if (recovery.status === 'failed') {
+      emailWarning =
+        'Approved, but recovery setup failed. Fix email delivery or the Authentik recovery flow, then use resend-invite.';
     }
   }
 
+  if (recoveryLink) {
+    res.set('Cache-Control', 'no-store');
+  }
   res.status(200).json({
     status: tenant.status,
     tenant: { id: tenant._id, slug: tenant.slug },
     ...(emailWarning ? { warning: emailWarning } : {}),
+    ...(recoveryLink ? { recoveryLink } : {}),
   });
 };
 
@@ -193,15 +250,19 @@ export const resendInvite = async (req: Request, res: Response): Promise<void> =
     return;
   }
 
-  try {
-    await sendOwnerRecoveryEmail(tenant);
-  } catch (err) {
-    logger.error(
-      `${TAG} resend-invite failed for ${tenant.slug}: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
+  const recovery = await resolveOwnerRecovery(tenant, 'resend-invite');
+  if (recovery.status === 'failed') {
     res.status(502).json({ error: 'Could not send the recovery email. Please try again.' });
+    return;
+  }
+  if (recovery.status === 'link_only') {
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({
+      status: 'link_only',
+      warning: 'Email delivery failed. Give the owner this one-time link instead.',
+      recoveryLink: recovery.link,
+      tenant: { id: tenant._id, slug: tenant.slug },
+    });
     return;
   }
 

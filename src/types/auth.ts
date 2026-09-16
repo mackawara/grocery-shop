@@ -10,8 +10,9 @@
 export interface SessionAuth {
   sub: string;
   email?: string;
-  // email_verified claim — required before an email may be trusted for the
-  // platform-admin allowlist (see platformAdminResolver).
+  // Raw email_verified claim. It is retained for resolvers that can consume a
+  // genuinely verified upstream IdP signal, but the platform-admin allowlist no
+  // longer depends on Authentik's default false claim.
   emailVerified: boolean;
   // Tenant of the VendorUser seat — present iff isVendor.
   tenantId?: string;

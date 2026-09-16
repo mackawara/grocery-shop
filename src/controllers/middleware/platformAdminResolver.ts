@@ -3,7 +3,9 @@ import type { Types } from 'mongoose';
 import PlatformUser from '../../models/PlatformUser.ts';
 import type { IPlatformUser } from '../../models/PlatformUser.ts';
 import { PlatformRole, PlatformUserStatus } from '../../constants/models.ts';
+import { PlatformGrantSource } from '../../constants/platformGrantSource.ts';
 import { isAllowlistedAdmin } from '../../services/platformMembership.ts';
+import { canUsePlatformGrant } from '../../services/platformGrant.ts';
 import { resolveMembership } from '../../services/vendorMembership.ts';
 import { logger } from '../../services/logger.ts';
 
@@ -31,7 +33,13 @@ const resolvePlatformUser = async (
     PlatformUser.findOne(filter).exec(),
   );
 
-  if (!admin || admin.status === PlatformUserStatus.DISABLED) {
+  if (
+    !admin ||
+    !canUsePlatformGrant(
+      { status: admin.status, role: admin.role, grantSource: admin.grantSource },
+      false,
+    )
+  ) {
     return null;
   }
 
@@ -46,12 +54,9 @@ const resolvePlatformUser = async (
 
 // Upsert the PlatformUser for an allowlisted email: bind sub, force active super
 // admin (self-heals a missing or disabled row), keep audit fields current. The
-// env allowlist is authoritative here, so this never denies — to revoke an
-// allowlisted admin, remove them from PLATFORM_ADMIN_EMAILS.
-const ensureAllowlistedAdmin = async (
-  sub: string,
-  email: string,
-): Promise<IPlatformUser | null> =>
+// env allowlist is authoritative here. New rows depend on continued allowlist
+// membership; explicit provisioning grants remain independent.
+const ensureAllowlistedAdmin = async (sub: string, email: string): Promise<IPlatformUser | null> =>
   PlatformUser.findOneAndUpdate(
     { email },
     {
@@ -60,8 +65,13 @@ const ensureAllowlistedAdmin = async (
         role: PlatformRole.SUPER_ADMIN,
         status: PlatformUserStatus.ACTIVE,
         lastLoginAt: new Date(),
+        // Vouched by the operator who put this address in PLATFORM_ADMIN_EMAILS.
+        // The email is operator-attested, but this grant still requires the
+        // address to remain in the current allowlist.
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
       },
-      $setOnInsert: { email },
+      $setOnInsert: { email, grantSource: PlatformGrantSource.ALLOWLIST },
     },
     { upsert: true, new: true },
   );
@@ -83,10 +93,10 @@ export const platformAdminResolver = async (
   }
   const { sub, email, emailVerified } = auth;
 
-  // A verified, allowlisted email is authoritative; otherwise fall back to a
-  // DB-managed PlatformUser. Allowlist requires email_verified so an unverified
-  // claim can't impersonate an allowlisted address.
-  const allowlisted = isAllowlistedAdmin(email, emailVerified);
+  // An allowlisted email is authoritative (operator-controlled deploy config —
+  // see isAllowlistedAdmin for why the IdP's email_verified claim is not part of
+  // this decision); otherwise fall back to a DB-managed PlatformUser.
+  const allowlisted = isAllowlistedAdmin(email);
 
   let admin: IPlatformUser | null;
   try {
@@ -100,7 +110,13 @@ export const platformAdminResolver = async (
     return;
   }
 
-  if (!admin || admin.role !== PlatformRole.SUPER_ADMIN) {
+  if (
+    !admin ||
+    !canUsePlatformGrant(
+      { status: admin.status, role: admin.role, grantSource: admin.grantSource },
+      allowlisted,
+    )
+  ) {
     logger.warn(`${TAG} denied — not an active super admin`);
     res.status(403).json({ error: 'Platform admin access required.' });
     return;

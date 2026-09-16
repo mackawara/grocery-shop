@@ -93,10 +93,13 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   const emailVerified = claims.email_verified === true;
   const expiresIn = tokens.expiresIn();
 
-  // First-login seat binding falls back to the email anchor only when the IdP
-  // marks the email verified (see resolveMembership). Log the claim so we can
-  // confirm Authentik's OIDC provider actually emits email_verified — without it,
-  // invited staff would silently dead-end at /no-access. No PII: a boolean only.
+  // First-login seat binding no longer depends on this claim: Authentik
+  // hardcodes it (false since 2025.10) rather than deriving it, so requiring it
+  // dead-ended every first login at /no-access. resolveMembership prefers our
+  // row-level emailVerified flag, accepts genuinely verified upstream IdP
+  // claims, and temporarily accepts authUserPk provenance until issue #51 ships.
+  // Still logged because it is the first thing to check when a bind fails.
+  // No PII: a boolean only.
   logger.info(`${TAG} id-token email_verified=${claims.email_verified === true}`);
 
   // What this identity may do is authoritative in our DB, not in the token:
@@ -160,34 +163,82 @@ export const callback = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
-// POST /auth/logout — destroy the session and return Authentik's end-session URL
-// for the SPA to navigate to (so the IdP session is cleared too).
-export const logout = async (req: Request, res: Response): Promise<void> => {
-  const idToken = req.session.tokens?.idToken;
+// Build the RP-initiated logout URL the SPA must navigate to so the IdP session
+// ends too, not just ours.
+//
+// Destroying our session alone is NOT a logout the user would recognise: the
+// Authentik session cookie survives, so the next "Sign in" silently completes
+// via SSO with no password prompt and it looks like logout did nothing. On a
+// shared machine that is a real exposure, not just a UX wart. So we always try
+// to reach the end-session endpoint, and we say so when we cannot.
+//
+// `id_token_hint` is preferred — it identifies the session to terminate and lets
+// Authentik honour post_logout_redirect_uri without prompting. But a session
+// whose tokens have been trimmed or whose idToken never landed must still be
+// able to log out, so we fall back to the discovered end_session_endpoint with
+// client_id, which is the spec's other accepted form. Falling back to the
+// dashboard URL is the last resort only, and is flagged.
+const buildLogoutUrl = async (
+  idToken: string | undefined,
+): Promise<{ url: string; endsIdpSession: boolean }> => {
+  try {
+    const config = await getOidcConfig();
 
-  let logoutUrl = CONFIG.DASHBOARD_URL;
-  if (idToken) {
-    try {
-      const config = await getOidcConfig();
-      logoutUrl = client.buildEndSessionUrl(config, {
+    if (idToken) {
+      const url = client.buildEndSessionUrl(config, {
         id_token_hint: idToken,
         post_logout_redirect_uri: CONFIG.AUTHENTIK_POST_LOGOUT_REDIRECT,
       }).href;
-    } catch (error) {
-      logger.warn(
-        `${TAG} could not build end-session URL: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      return { url, endsIdpSession: true };
     }
+
+    // No usable hint — still send the browser to the IdP so its cookie is
+    // cleared, but WITHOUT post_logout_redirect_uri: Authentik rejects that
+    // parameter unless id_token_hint is present (verified against the live
+    // provider — bare and client_id-only both 302, either combination with
+    // post_logout_redirect_uri 400s). Sending it anyway would produce a URL that
+    // errors, i.e. no logout at all. The trade-off is that the user lands on
+    // Authentik's own post-logout page rather than back on /login; being signed
+    // out somewhere slightly unfamiliar beats being silently signed in.
+    const url = client.buildEndSessionUrl(config, {
+      client_id: CONFIG.AUTHENTIK_CLIENT_ID,
+    }).href;
+    logger.warn(`${TAG} logout without id_token_hint — client_id form, no return redirect`);
+    return { url, endsIdpSession: true };
+  } catch (error) {
+    // Discovery unreachable, or the provider advertises no end_session_endpoint.
+    // Our session is still destroyed below, but the IdP session will persist.
+    logger.error(
+      `${TAG} could not build end-session URL — IdP session will persist: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return { url: CONFIG.DASHBOARD_URL, endsIdpSession: false };
   }
+};
+
+// POST /auth/logout — destroy the session and return Authentik's end-session URL
+// for the SPA to navigate to (so the IdP session is cleared too). `endsIdpSession`
+// tells the client whether that second half actually happened, so it can warn the
+// user to close their browser rather than claim a full sign-out it didn't achieve.
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  const { url: logoutUrl, endsIdpSession } = await buildLogoutUrl(req.session.tokens?.idToken);
 
   req.session.destroy((err) => {
     if (err) {
       logger.error(`${TAG} session destroy failed: ${err.message}`);
     }
-    res.clearCookie(CONFIG.SESSION_COOKIE_NAME);
-    res.json({ logoutUrl });
+    // Clear with the same attributes the cookie was set with — a mismatched
+    // path/sameSite/secure leaves the browser holding a stale cookie. The
+    // server-side record is gone either way, but a lingering cookie makes the
+    // next request look like a hijack attempt in the logs.
+    res.clearCookie(CONFIG.SESSION_COOKIE_NAME, {
+      httpOnly: true,
+      secure: !CONFIG.IS_LOCAL_ENVIRONMENT,
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.json({ logoutUrl, endsIdpSession });
   });
 };
 

@@ -144,7 +144,11 @@ export const signupStart = async (req: Request, res: Response): Promise<void> =>
       () => sendAuthOtp(phone, code),
     );
     if (CONFIG.IS_LOCAL_ENVIRONMENT) {
-      logger.info(`${TAG} OTP for ${phone} is ${code}`);
+      // Local dev proceeds even if the WhatsApp send failed, so the flow is
+      // testable without live credentials. The code itself is NOT logged here —
+      // generateSignupOtp already does that under the same flag, with the phone
+      // masked; logging it again unmasked leaked a live credential and the full
+      // number into the log.
       const pending: PendingSignup = { displayName, email, country, ownerName };
       await redisClient.set(pendingKey(phone), JSON.stringify(pending), {
         EX: SIGNUP_OTP_TTL_SECONDS,
