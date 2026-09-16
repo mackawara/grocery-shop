@@ -1,6 +1,7 @@
 import type { Document } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 import { PlatformRole, PlatformUserStatus } from '../constants/models.ts';
+import { PlatformGrantSource } from '../constants/platformGrantSource.ts';
 
 export { PlatformRole, PlatformUserStatus };
 
@@ -20,6 +21,13 @@ export interface IPlatformUser extends Document {
   name?: string;
   role: PlatformRole;
   status: PlatformUserStatus;
+  // Missing on legacy rows. Those rows require current allowlist membership
+  // until an operator explicitly re-provisions them as independent grants.
+  grantSource?: PlatformGrantSource;
+  // See VendorUser.emailVerified. Platform admin bootstrap and the allowlist can
+  // stamp this as operator attestation; vendor signup/invitation rows do not.
+  emailVerified: boolean;
+  emailVerifiedAt?: Date;
   lastLoginAt?: Date;
 }
 
@@ -40,6 +48,9 @@ const PlatformUserSchema = new Schema<IPlatformUser>(
       default: PlatformUserStatus.ACTIVE,
       index: true,
     },
+    grantSource: { type: String, enum: Object.values(PlatformGrantSource) },
+    emailVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date },
     lastLoginAt: { type: Date },
   },
   { timestamps: true },
