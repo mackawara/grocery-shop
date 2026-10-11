@@ -47,10 +47,9 @@ export const whatsappTenantResolver = async (
     return;
   }
 
-  // Allowlist (fail closed): only these statuses get webhook access. TRIAL
-  // tenants intentionally get full access. Any other/new status (INACTIVE,
-  // SUSPENDED, or one added to the enum later) is rejected by default.
-  const ALLOWED_STATUSES = [TenantStatus.ACTIVE, TenantStatus.TRIAL];
+  // TRIAL is approved onboarding, not the free billing trial. Only an ACTIVE
+  // vendor has passed the setup-fee gate; its billing trial starts at go-live.
+  const ALLOWED_STATUSES = [TenantStatus.ACTIVE];
   if (!ALLOWED_STATUSES.includes(tenant.status)) {
     logger.warn(`[whatsappTenantResolver] tenant ${tenant._id} is ${tenant.status} — acking 200`);
     res.status(200).json({ success: true });

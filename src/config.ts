@@ -77,6 +77,11 @@ const publicBaseUrl =
   (isLocal && process.env.NGROK_DOMAIN ? `https://${process.env.NGROK_DOMAIN}` : '');
 
 export const CONFIG = {
+  // Platform collection credentials, distinct from vendor customer-payment
+  // credentials. Optional at boot; billing Pay fails closed until configured.
+  BILLING_PAYNOW_INTEGRATION_ID: process.env.BILLING_PAYNOW_INTEGRATION_ID || '',
+  BILLING_PAYNOW_INTEGRATION_KEY: process.env.BILLING_PAYNOW_INTEGRATION_KEY || '',
+  BILLING_PAYNOW_AUTH_EMAIL: process.env.BILLING_PAYNOW_AUTH_EMAIL || '',
   IS_LOCAL_ENVIRONMENT: isLocal,
   PORT: parseInt(process.env.PORT || '0', 10) || 5000,
   REDIS_HOST_PORT: process.env.REDIS_HOST_PORT ? parseInt(process.env.REDIS_HOST_PORT) : 6379,

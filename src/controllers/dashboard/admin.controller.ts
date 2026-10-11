@@ -9,6 +9,7 @@ import { runWithTenant } from '../../context/tenantContext.ts';
 import { authentik } from '../../services/authentik.ts';
 import type { PlatformActor } from '../middleware/platformAdminResolver.ts';
 import { logger } from '../../services/logger.ts';
+import { audit, ensureSetup, transaction } from '../../billing/service.ts';
 
 // Platform-admin (super admin) actions. Gated by platformAdminResolver, which
 // runs WITHOUT a tenant context — these handlers act across tenants. Tenant is
@@ -141,10 +142,19 @@ const transitionPendingTenant = async (
     return;
   }
 
-  tenant.status = next;
-  await tenant.save();
-
   const actor = res.locals.platformActor as PlatformActor | undefined;
+  await runWithTenant(
+    String(tenant._id),
+    () =>
+      transaction(async (session) => {
+        if (next === TenantStatus.TRIAL) {
+          await ensureSetup(tenant, actor?.email ?? 'unknown', new Date(), session);
+        }
+        tenant.status = next;
+        await tenant.save({ session });
+      }),
+    tenant.slug,
+  );
   logger.info(
     `${TAG} ${verb} tenant ${tenant.slug} (${tenant._id}) by ${actor?.email ?? 'unknown'}`,
   );
@@ -203,12 +213,14 @@ export const activateTenant = async (req: Request, res: Response): Promise<void>
     res.status(404).json({ error: 'Tenant not found.' });
     return;
   }
-  if (tenant.status !== TenantStatus.TRIAL) {
-    res.status(409).json({ error: `Tenant is ${tenant.status}, not trial.` });
+  if (
+    ![TenantStatus.TRIAL, TenantStatus.SUSPENDED, TenantStatus.INACTIVE].includes(tenant.status)
+  ) {
+    res.status(409).json({ error: `Tenant is ${tenant.status} and cannot be activated.` });
     return;
   }
 
-  const missing = missingActivationFields(tenant);
+  const missing = await missingActivationFields(tenant);
   if (missing.length > 0) {
     res.status(422).json({
       error: 'Tenant is not ready for activation.',
@@ -217,10 +229,23 @@ export const activateTenant = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  tenant.status = TenantStatus.ACTIVE;
-  await tenant.save();
-
   const actor = res.locals.platformActor as PlatformActor | undefined;
+  await runWithTenant(
+    String(tenant._id),
+    () =>
+      transaction(async (session) => {
+        tenant.status = TenantStatus.ACTIVE;
+        await tenant.save({ session });
+        await audit(
+          actor?.email ?? 'unknown',
+          'activate',
+          'Admin activated vendor after setup settlement',
+          {},
+          session,
+        );
+      }),
+    tenant.slug,
+  );
   logger.info(
     `${TAG} activated tenant ${tenant.slug} (${tenant._id}) by ${actor?.email ?? 'unknown'}`,
   );

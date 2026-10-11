@@ -91,6 +91,9 @@ jobs:
       - name: Write api.env from secrets
         env:
           SKIP_ENV_CHECK: ${{ inputs.skip_env_check }}
+          BILLING_PAYNOW_INTEGRATION_ID: ${{ secrets.BILLING_PAYNOW_INTEGRATION_ID }}
+          BILLING_PAYNOW_INTEGRATION_KEY: ${{ secrets.BILLING_PAYNOW_INTEGRATION_KEY }}
+          BILLING_PAYNOW_AUTH_EMAIL: ${{ secrets.BILLING_PAYNOW_AUTH_EMAIL }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           PORT: ${{ secrets.PORT }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
@@ -153,6 +156,9 @@ jobs:
             # never set them here. REDIS_HOST_PORT is fixed by the redis:7
             # image's default port, not a secret.
             echo "APP_ENV=production"
+            echo "BILLING_PAYNOW_INTEGRATION_ID=${BILLING_PAYNOW_INTEGRATION_ID}"
+            echo "BILLING_PAYNOW_INTEGRATION_KEY=${BILLING_PAYNOW_INTEGRATION_KEY}"
+            echo "BILLING_PAYNOW_AUTH_EMAIL=${BILLING_PAYNOW_AUTH_EMAIL}"
             echo "REDIS_HOST_PORT=6379"
             echo "MONGODB_USERNAME=${MONGODB_USERNAME}"
             echo "MONGODB_PASSWORD=${MONGODB_PASSWORD}"

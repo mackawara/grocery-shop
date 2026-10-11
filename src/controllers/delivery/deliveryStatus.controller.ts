@@ -3,7 +3,12 @@ import { logger } from '../../services/logger.ts';
 import whatsappMessager from '../whatsapp/outgoingMessages.ts';
 import OrderModel from '../../models/Order.ts';
 import UserModel from '../../models/User.ts';
-import { DeliveryMethod, DeliveryStatus, OrderStatus } from '../../constants/models.ts';
+import {
+  DeliveryMethod,
+  DeliveryStatus,
+  OrderStatus,
+  PaymentStatus,
+} from '../../constants/models.ts';
 import { requireTenantId } from '../../context/tenantContext.ts';
 import { advanceDelivery } from '../../delivery/index.ts';
 import type { DeliveryTransition, IDelivery } from '../../delivery/index.ts';
@@ -70,6 +75,13 @@ export const advanceDeliveryStatus = async (
       const order = await OrderModel.findById(orderId).session(session);
       if (!order) {
         outcome = { ok: false, reason: 'not_found' };
+        return;
+      }
+      if (
+        order.status === OrderStatus.CANCELLED ||
+        order.paymentDetails.status === PaymentStatus.REFUNDED
+      ) {
+        outcome = { ok: false, reason: 'backwards' };
         return;
       }
 

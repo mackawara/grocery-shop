@@ -182,7 +182,7 @@ const PaymentRoutingSchema = new Schema<Partial<Record<PaymentMethod, PaymentPro
 // actually send", not just "the ids are present". Deliberately NOT added yet:
 // nothing can satisfy it until that endpoint exists, so it would block every
 // activation in the meantime.
-export const missingActivationFields = (tenant: ITenant): string[] => {
+export const missingActivationFields = async (tenant: ITenant): Promise<string[]> => {
   const missing: string[] = [];
   if (!tenant.whatsappPhoneNumberId?.trim()) {
     missing.push('whatsappPhoneNumberId');
@@ -195,6 +195,16 @@ export const missingActivationFields = (tenant: ITenant): string[] => {
   }
   if (!tenant.deliveryMethods?.length) {
     missing.push('deliveryMethods');
+  }
+  const { runWithTenant } = await import('../context/tenantContext.ts');
+  const { setupSettled } = await import('../billing/service.ts');
+  const settled = await runWithTenant(
+    String(tenant._id),
+    () => setupSettled(tenant.$session() ?? undefined),
+    tenant.slug,
+  );
+  if (!settled) {
+    missing.push('setupFee');
   }
   return missing;
 };
@@ -320,17 +330,55 @@ TenantSchema.pre<ITenant>('validate', async function () {
 // activate endpoint pre-checks and reports the missing fields; this hook holds
 // every other save path to the same bar. Already-ACTIVE tenants saving
 // unrelated changes are untouched — only the transition is gated.
-TenantSchema.pre<ITenant>('validate', function () {
+TenantSchema.pre<ITenant>('validate', async function () {
   if (this.status !== TenantStatus.ACTIVE) {
     return;
   }
   if (!this.isNew && !this.isModified('status')) {
     return;
   }
-  const missing = missingActivationFields(this);
+  const missing = await missingActivationFields(this);
   if (missing.length > 0) {
     throw new TenantActivationError(missing);
   }
 });
+
+TenantSchema.pre<ITenant>('save', async function () {
+  if (this.status !== TenantStatus.ACTIVE || (!this.isNew && !this.isModified('status'))) {
+    return;
+  }
+  // The activation and first free-trial timestamp must commit atomically.
+  const session = this.$session();
+  if (!session?.inTransaction()) {
+    throw new TenantActivationError(['billingTransaction']);
+  }
+  const { runWithTenant } = await import('../context/tenantContext.ts');
+  const { startTrial } = await import('../billing/service.ts');
+  await runWithTenant(String(this._id), () => startTrial(new Date(), session), this.slug);
+});
+
+// Query updates skip document validation and trial initialization. Status
+// transitions to ACTIVE must use a transactional save through the activation
+// service; credential/profile query updates remain available.
+for (const operation of [
+  'updateOne',
+  'updateMany',
+  'findOneAndUpdate',
+  'replaceOne',
+  'findOneAndReplace',
+] as const) {
+  TenantSchema.pre(operation, function () {
+    const update = this.getUpdate();
+    if (Array.isArray(update)) {
+      throw new TenantActivationError(['documentSaveRequired']);
+    }
+    if (
+      update &&
+      (update.status === TenantStatus.ACTIVE || update.$set?.status === TenantStatus.ACTIVE)
+    ) {
+      throw new TenantActivationError(['documentSaveRequired']);
+    }
+  });
+}
 
 export default mongoose.model<ITenant>('Tenant', TenantSchema);

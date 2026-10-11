@@ -16,6 +16,7 @@ import { csrfGuard } from './controllers/middleware/csrf.js';
 import type { RawBodyRequest } from './controllers/middleware/verifyWhatsappSignature.js';
 import cors from 'cors';
 import helmet from 'helmet';
+import billingRoutes from './billing/routes.ts';
 
 const app = express();
 
@@ -40,6 +41,9 @@ app.use(
     },
   }),
 );
+// Paynow signatures cover the original form bytes. Register billing's raw
+// callback before JSON parsing, independently of browser sessions/CSRF.
+app.use('/billing', billingRoutes);
 app.use(express.json());
 app.use(helmet());
 
