@@ -1,4 +1,12 @@
 import { Router } from 'express';
+import {
+  adminState,
+  adminRate,
+  adminPromo,
+  adminPolicy,
+  adminTenantAction,
+  billingHandler,
+} from '../billing/controller.ts';
 import { platformAdminResolver } from '../controllers/middleware/platformAdminResolver.ts';
 import {
   getAdminMe,
@@ -16,11 +24,17 @@ const router = Router();
 router.use(platformAdminResolver);
 
 router.get('/me', getAdminMe);
+router.get('/billing', adminState);
+router.post('/billing/rates', adminRate);
+router.post('/billing/promos', adminPromo);
+router.post('/billing/policy', adminPolicy);
+router.get('/tenants/:id/billing', adminTenantAction);
+router.post('/tenants/:id/billing/:action', adminTenantAction);
 router.get('/tenants', listTenants);
 router.get('/tenants/pending', listPendingTenants);
-router.post('/tenants/:id/approve', approveTenant);
+router.post('/tenants/:id/approve', billingHandler(approveTenant));
 router.post('/tenants/:id/reject', rejectTenant);
-router.post('/tenants/:id/activate', activateTenant);
+router.post('/tenants/:id/activate', billingHandler(activateTenant));
 router.post('/tenants/:id/resend-invite', resendInvite);
 
 export default router;

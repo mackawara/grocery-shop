@@ -72,6 +72,12 @@ grocery-DASHBOARD additionally needs:
 
 ## Application secrets (`api.env`)
 
+Vendor invoice collection uses the platform's own USD Paynow integration:
+`BILLING_PAYNOW_INTEGRATION_ID`, `BILLING_PAYNOW_INTEGRATION_KEY`, and
+`BILLING_PAYNOW_AUTH_EMAIL`. The API can boot without these, but invoice payment
+fails closed until configured. Never use a vendor's integration here. See
+[billing rollout and accounting rules](../docs/billing.md).
+
 grocery-shop only. Each `src/config.ts` value is its own GitHub secret so a
 single credential can be rotated (update the secret, redeploy) without
 touching any of the others. The **Write api.env from secrets** step in

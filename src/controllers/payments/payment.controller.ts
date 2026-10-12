@@ -355,7 +355,10 @@ export const isPaynowWebhookAccepted = async (
         order = await OrderModel.findOne({ orderNumber }).session(session);
         if (order) {
           order.paymentDetails.status = status;
-          if (status === PaymentStatus.PAID) {
+          if (
+            status === PaymentStatus.PAID &&
+            ![OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(order.status)
+          ) {
             order.status = OrderStatus.CONFIRMED;
           }
           await order.save({ session });

@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { vendorSummary, orderBillingStatus } from '../billing/controller.ts';
+import { payInvoice } from '../billing/payments.ts';
 import multer from 'multer';
 import {
   signupStart,
@@ -66,7 +68,10 @@ import {
   getConversationHandler,
 } from '../controllers/dashboard/chats.controller.ts';
 import { rateLimit } from '../controllers/middleware/rateLimit.ts';
-import { dashboardAuthResolver } from '../controllers/middleware/dashboardAuthResolver.ts';
+import {
+  dashboardAuthResolver,
+  billingAuthResolver,
+} from '../controllers/middleware/dashboardAuthResolver.ts';
 import { activationResolver } from '../controllers/middleware/activationResolver.ts';
 import { requireRole } from '../controllers/middleware/requireRole.ts';
 import { UserRole } from '../constants/models.ts';
@@ -178,6 +183,19 @@ const configWrite = [
   dashboardAuthResolver,
   requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER),
 ] as const;
+router.get(
+  '/billing',
+  billingAuthResolver,
+  requireRole(UserRole.VENDOR, UserRole.SHOP_MANAGER),
+  vendorSummary,
+);
+router.post(
+  '/billing/invoices/:id/pay',
+  billingAuthResolver,
+  requireRole(UserRole.VENDOR),
+  payInvoice,
+);
+router.post('/orders/:id/billing-status', ...configWrite, orderBillingStatus);
 // Business profile. The shop's GPS lives here and every ring zone / per-km cell
 // is measured from it, so this is delivery configuration in all but name —
 // gated identically.

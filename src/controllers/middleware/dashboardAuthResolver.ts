@@ -85,6 +85,7 @@ export const withVendorSession = async (
     resolution: VendorResolution,
     tenant: InstanceType<typeof Tenant>,
   ) => void | Promise<void>,
+  billingOnly = false,
 ): Promise<void> => {
   const auth = req.session.auth;
   if (!auth) {
@@ -129,6 +130,9 @@ export const withVendorSession = async (
   // Every other status stays a bare denial — we do not tell a rejected or
   // suspended applicant which of the two they are.
   const ALLOWED_STATUSES = [TenantStatus.ACTIVE, TenantStatus.TRIAL];
+  if (billingOnly) {
+    ALLOWED_STATUSES.push(TenantStatus.SUSPENDED);
+  }
   if (!ALLOWED_STATUSES.includes(tenant.status)) {
     logger.warn(`${TAG} tenant ${tenant._id} is ${tenant.status} — denying`);
     if (tenant.status === TenantStatus.PENDING) {
@@ -155,29 +159,48 @@ export const withVendorSession = async (
 // Gate for all authenticated /dashboard routes. An active seat proceeds; an
 // invited-but-unverified seat is bounced to the activation gate (distinct
 // `activation_required` code so the SPA can route there); anything else is denied.
-export const dashboardAuthResolver = async (
+const resolveDashboardSession = async (
   req: Request,
   res: Response,
   next: NextFunction,
+  billingOnly = false,
 ): Promise<void> => {
-  await withVendorSession(req, res, (resolution, tenant) => {
-    if (resolution.kind === 'denied') {
-      logger.warn(`${TAG} no active VendorUser for sub in tenant ${tenant._id}`);
-      res.status(403).json({ error: 'You do not have access to this account.' });
-      return;
-    }
-    if (resolution.kind === 'needs_activation') {
-      res.status(403).json({ error: 'Verify your phone to activate your account.', code: 'activation_required' });
-      return;
-    }
-    const { vendorUser } = resolution;
-    const actor: DashboardActor = {
-      vendorUserId: (vendorUser._id as Types.ObjectId).toString(),
-      tenantId: (tenant._id as Types.ObjectId).toString(),
-      email: vendorUser.email,
-      role: vendorUser.role,
-    };
-    res.locals.actor = actor;
-    next();
-  });
+  await withVendorSession(
+    req,
+    res,
+    (resolution, tenant) => {
+      if (resolution.kind === 'denied') {
+        logger.warn(`${TAG} no active VendorUser for sub in tenant ${tenant._id}`);
+        res.status(403).json({ error: 'You do not have access to this account.' });
+        return;
+      }
+      if (resolution.kind === 'needs_activation') {
+        res.status(403).json({
+          error: 'Verify your phone to activate your account.',
+          code: 'activation_required',
+        });
+        return;
+      }
+      const { vendorUser } = resolution;
+      const actor: DashboardActor = {
+        vendorUserId: (vendorUser._id as Types.ObjectId).toString(),
+        tenantId: (tenant._id as Types.ObjectId).toString(),
+        email: vendorUser.email,
+        role: vendorUser.role,
+      };
+      res.locals.actor = actor;
+      next();
+    },
+    billingOnly,
+  );
 };
+export const dashboardAuthResolver = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => resolveDashboardSession(req, res, next);
+export const billingAuthResolver = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => resolveDashboardSession(req, res, next, true);

@@ -3,6 +3,7 @@ import { logger } from './services/logger.ts';
 import { RedisService } from './services/redis.ts';
 import { CONFIG } from './config.ts';
 import { connectDb } from './services/database.ts';
+import { startBillingWorker } from './billing/worker.ts';
 
 Promise.race([
   RedisService.getInstance().connect(),
@@ -13,8 +14,9 @@ Promise.race([
   }),
 ])
   .then(async () => {
-    startServer();
     await connectDb();
+    await startBillingWorker();
+    startServer();
   })
   .catch((error) => {
     logger.error(error);

@@ -14,6 +14,10 @@ export interface IOrder extends Document {
   totalAmount: number;
   status: OrderStatus;
   orderDate: Date;
+  // First completion is permanent, even if subsequently refunded/cancelled.
+  completedAt?: Date;
+  billingItemsMinor?: number;
+  billingNeedsSync?: boolean;
   notes?: string;
   orderItems: Types.ObjectId[];
   paymentDetails: {
@@ -53,6 +57,9 @@ const OrderSchema = new Schema<IOrder>(
       default: OrderStatus.PENDING,
     },
     orderDate: { type: Date, required: true },
+    completedAt: { type: Date, index: true },
+    billingItemsMinor: { type: Number, min: 0, validate: Number.isSafeInteger },
+    billingNeedsSync: { type: Boolean },
     notes: { type: String },
     orderItems: [{ type: Schema.Types.ObjectId, ref: 'OrderItem' }],
     // Back-reference to the fulfilment job — written only by
@@ -71,5 +78,64 @@ const OrderSchema = new Schema<IOrder>(
 OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
 
 OrderSchema.plugin(tenantScope);
+
+OrderSchema.pre<IOrder>('save', async function () {
+  this.$locals.billingChanged =
+    this.isNew || this.isModified('status') || this.isModified('paymentDetails.status');
+  if (this.$locals.billingChanged && this.completedAt) {
+    this.billingNeedsSync = true;
+  }
+  if (this.status === OrderStatus.COMPLETED && !this.completedAt) {
+    const { itemSubtotal } = await import('../billing/service.ts');
+    this.billingItemsMinor = await itemSubtotal(
+      this._id as Types.ObjectId,
+      this.$session() ?? undefined,
+    );
+    this.completedAt = new Date();
+    this.billingNeedsSync = true;
+  }
+});
+OrderSchema.post<IOrder>('save', async function (order) {
+  if (!order.completedAt || !order.$locals.billingChanged) {
+    return;
+  }
+  const { syncOrderBilling, transaction } = await import('../billing/service.ts');
+  const session = order.$session();
+  if (session) {
+    await syncOrderBilling(order, session);
+  } else {
+    await transaction((s) => syncOrderBilling(order, s));
+  }
+});
+
+// Lifecycle queries would skip first-completion snapshots and accrual hooks.
+// Use save() inside a transaction for completion, cancellation and refunds.
+for (const operation of [
+  'updateOne',
+  'updateMany',
+  'findOneAndUpdate',
+  'replaceOne',
+  'findOneAndReplace',
+] as const) {
+  OrderSchema.pre(operation, function () {
+    const update = this.getUpdate();
+    if (Array.isArray(update)) {
+      throw new Error('Order lifecycle changes require document save');
+    }
+    if (!update) {
+      return;
+    }
+    const fields = { ...update, ...update.$set, ...update.$unset };
+    if (
+      'status' in fields ||
+      'paymentDetails' in fields ||
+      'paymentDetails.status' in fields ||
+      'completedAt' in fields ||
+      'billingItemsMinor' in fields
+    ) {
+      throw new Error('Order lifecycle changes require document save');
+    }
+  });
+}
 
 export default mongoose.model<IOrder>('Order', OrderSchema);
