@@ -31,7 +31,8 @@ best preserves tenant isolation — don't just pick one.
 
 ## Stack
 
-- **Runtime:** Node.js, **TypeScript strict**, **CommonJS** (`module: commonjs`, target es2017).
+- **Runtime:** Node.js, **TypeScript strict**, **ESM** (`"type": "module"`, `module: NodeNext`,
+  `moduleResolution: NodeNext`, target ES2022).
 - **HTTP:** Express 5 (`helmet`, `cors`, `morgan`).
 - **DB:** MongoDB via **Mongoose** (`mongodb+srv`).
 - **Cache/state:** Redis (`redis` v5), singleton `RedisService`.
@@ -41,7 +42,8 @@ best preserves tenant isolation — don't just pick one.
 
 ### Scripts
 
-- `yarn dev` — nodemon + ts-node (`src/index.ts`).
+- `yarn dev` — nodemon + tsx (`src/index.ts`).
+- `yarn test` — `tsx --test test/*.test.ts` (Node's built-in test runner).
 - `yarn build` — `tsc` → `dist/`. `yarn start` — `node dist/index.js`.
 - `yarn seed:local` — seed a local tenant (`src/scripts/seedLocalTenant.ts`).
 - `yarn ngrok` — public tunnel for WhatsApp/Paynow callbacks in local dev.
@@ -197,7 +199,10 @@ src/
 
 ## Conventions
 
-- **TypeScript strict**, CommonJS imports. Prefer `import type` for type-only imports.
+- **TypeScript strict**, ESM imports. Prefer `import type` for type-only imports.
+- **Relative imports use the `.ts` extension**, e.g.
+  `import { tenantScope } from './plugins/tenantScope.ts'`. `tsc` rewrites `.ts` → `.js` on
+  emit (`allowImportingTsExtensions` + `rewriteRelativeImportExtensions`).
 - **Always use curly braces `{}`** for `if`/loops, even single-line bodies.
 - **Logging:** use the Winston `logger` with a `[TAG]` prefix (e.g. `[whatsappTenantResolver]`);
   the tenant label is added automatically. **Never log secrets, tokens, or payment credentials.**
